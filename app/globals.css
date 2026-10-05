@@ -22,3 +22,35 @@
 .earnCard b{font-size:12px}.earnCard span{font-size:9px;color:#8493a8}.earnCard small{font-size:8px;color:#63748b}
 @media(max-width:900px){.earnGrid{grid-template-columns:repeat(2,1fr)}}
 @media(max-width:520px){.earnGrid{grid-template-columns:1fr}}
+
+/* Thai readability */
+body{font-family:"Noto Sans Thai","Leelawadee UI",Tahoma,Inter,ui-sans-serif,system-ui,sans-serif;font-size:14px}
+.eyebrow{font-size:10px;letter-spacing:1px}
+.nav{font-size:13px}
+.method{font-size:12px}.method span{font-size:10px}.method small{font-size:11px}
+.header h1{font-size:30px}.searchbox input{font-size:13px}
+.hero h2{font-size:30px}.hero p{font-size:14px;line-height:1.7}
+.heroActions button{font-size:12px;padding:11px 14px}
+.heroScore span,.heroScore small{font-size:12px}
+.metric span{font-size:11px}.metric strong{font-size:25px}.metric small{font-size:11px}
+.sectionHead h3{font-size:17px}.sectionHead button{font-size:12px}
+.ticker b{font-size:15px}.ticker span{font-size:11px}
+.opBody{font-size:11px}.badge{font-size:10px}.miniVal{font-size:11px}
+.newsItem b{font-size:13px}.newsItem small{font-size:10px}
+.changeItem b{font-size:14px}.changeItem span{font-size:10px}.changeItem strong{font-size:12px}.changeItem small{font-size:10px}
+.changeExplain{border:1px solid #2a3b59;background:#121d2c;color:#aebcff;border-radius:7px;padding:5px 8px;font-size:10px;margin-top:7px}
+.changeAI{margin:8px 0 0;color:#cbd5e4;font-size:12px;line-height:1.7;background:#0a111c;border:1px solid #1d2c43;border-radius:8px;padding:9px}
+.brief{font-size:13px;line-height:1.9}
+.earnCard b{font-size:14px}.earnCard span{font-size:11px}.earnCard small{font-size:10px}
+.explain strong{font-size:20px}.explain b{font-size:13px}.explain span{font-size:11px;line-height:1.65}
+.notice{font-size:12px;line-height:1.6}
+.rankHead{font-size:10px}.rankRow{font-size:13px}.rankRow .ticker small{font-size:10px}
+.portfolioCards .metric strong{font-size:24px}.holding b{font-size:14px}.holding small{font-size:11px}
+.primary,.secondary{font-size:12px}
+.drawerTop h2{font-size:38px}.drawerTop p{font-size:13px}.priceLine strong{font-size:30px}.priceLine span{font-size:12px}
+.freshness{font-size:10px}.zone small{font-size:10px}.zone b{font-size:12px}
+.block h3{font-size:13px}.dataGrid span{font-size:11px}.dataGrid b{font-size:13px}
+.reliability b{font-size:12px}.reliability span{font-size:11px;line-height:1.6}
+.explanation{font-size:13px;line-height:1.8}.aiResult>b{font-size:12px}.aiResult p{font-size:13px;line-height:1.8}
+.drawerNote{font-size:10px}.positionForm label{font-size:10px}
+@media(max-width:700px){.header h1{font-size:25px}.hero h2{font-size:25px}.hero p{font-size:13px}.sectionHead h3{font-size:16px}.brief{font-size:12px}.drawerTop h2{font-size:32px}}
