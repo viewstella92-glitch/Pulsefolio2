@@ -12,17 +12,19 @@ const dateShort=x=>x?new Date(x).toLocaleDateString("en-US",{month:"short",day:"
 
 export default function Home(){
   const [stocks,setStocks]=useState([]),[tab,setTab]=useState("home"),[selected,setSelected]=useState(null),[search,setSearch]=useState("");
-  const [loading,setLoading]=useState(true),[ai,setAi]=useState(""),[aiLoading,setAiLoading]=useState(false),[watch,setWatch]=useState([]);
+  const [loading,setLoading]=useState(true),[error,setError]=useState(""),[ai,setAi]=useState(""),[aiLoading,setAiLoading]=useState(false),[watch,setWatch]=useState([]);
   const [quotes,setQuotes]=useState({}),[news,setNews]=useState([]),[earnings,setEarnings]=useState([]),[portfolio,setPortfolio]=useState({});
   const load=async()=>{
     setLoading(true);
     try{
       const [s,q,n,e]=await Promise.all([fetch("/api/stocks",{cache:"no-store"}),fetch("/api/market",{cache:"no-store"}),fetch("/api/news",{cache:"no-store"}),fetch("/api/earnings",{cache:"no-store"})]);
       const sd=await s.json(),qd=await q.json(),nd=await n.json(),ed=await e.json();
+      if(!s.ok || sd.error) throw new Error(sd.error||"โหลดข้อมูลหุ้นไม่สำเร็จ");
       setStocks(sd.stocks||[]);
+      setError("");
       setQuotes(Object.fromEntries((qd.quotes||[]).map(x=>[x.ticker,x])));
       setNews(nd.news||[]);setEarnings(ed.earnings||[]);
-    }catch{}finally{setLoading(false)}
+    }catch(e){setError(e?.message||"ไม่สามารถโหลดข้อมูลได้")}finally{setLoading(false)}
   };
   useEffect(()=>{load();try{setWatch(JSON.parse(localStorage.getItem("pulse-watch")||"[]"));setPortfolio(JSON.parse(localStorage.getItem("pulse-portfolio")||"{}"))}catch{}},[]);
   useEffect(()=>localStorage.setItem("pulse-watch",JSON.stringify(watch)),[watch]);
@@ -41,7 +43,7 @@ export default function Home(){
       <Nav active={tab==="home"} onClick={()=>setTab("home")}>Overview</Nav><Nav active={tab==="rank"} onClick={()=>setTab("rank")}>Stock Ranking</Nav><Nav active={tab==="watch"} onClick={()=>setTab("watch")}>Watchlist <em>{watch.length}</em></Nav><Nav active={tab==="portfolio"} onClick={()=>setTab("portfolio")}>Portfolio <em>{portfolioRows.length}</em></Nav>
     </nav><div className="method"><span>ANALYSIS MODEL</span><b>Valuation 35%</b><b>Growth 30%</b><b>Quality 20%</b><b>Risk 10%</b><b>News 5%</b><small>Prices are market data and may be delayed.</small></div></aside>
     <section className="main"><header className="header"><div><span className="eyebrow">PERSONAL INVESTMENT DASHBOARD</span><h1>{tab==="home"?"Market Overview":tab==="rank"?"Stock Ranking":tab==="watch"?"My Watchlist":"My Portfolio"}</h1></div><div className="searchbox">⌕<input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search ticker or company"/></div></header>
-      {loading?<div className="loading">Loading market data…</div>:tab==="home"?<HomeView stocks={ranked} buys={buys} portfolioRows={portfolioRows} totalValue={totalValue} totalPnl={totalPnl} news={newsRows} earnings={earnings} onOpen={setSelected} onRank={()=>setTab("rank")} onReload={load}/>:tab==="rank"?<Ranking rows={filtered} onOpen={setSelected}/>:tab==="watch"?<Watchlist rows={watchRows} onOpen={setSelected}/>:<Portfolio rows={portfolioRows} totalValue={totalValue} totalCost={totalCost} totalPnl={totalPnl} onOpen={setSelected}/>}
+      {loading?<div className="loading">Loading market data…</div>:error?<div className="errorCard"><b>ยังโหลดข้อมูลสกอร์ไม่ได้</b><span>{error}</span><button className="primary" onClick={load}>ลองใหม่</button><small>ถ้ายังไม่ขึ้น ปัญหาอยู่ที่การเชื่อมต่อ API ไม่ใช่หน้าแสดงผล</small></div>:tab==="home"?<HomeView stocks={ranked} buys={buys} portfolioRows={portfolioRows} totalValue={totalValue} totalPnl={totalPnl} news={newsRows} earnings={earnings} onOpen={setSelected} onRank={()=>setTab("rank")} onReload={load}/>:tab==="rank"?<Ranking rows={filtered} onOpen={setSelected}/>:tab==="watch"?<Watchlist rows={watchRows} onOpen={setSelected}/>:<Portfolio rows={portfolioRows} totalValue={totalValue} totalCost={totalCost} totalPnl={totalPnl} onOpen={setSelected}/>}
       <footer>Fundamentals & analysis: Supabase · Quotes: Yahoo Finance · News/Earnings: public Yahoo/Google RSS & Yahoo calendar · AI: Gemini optional</footer>
     </section>
     {selected&&<StockDrawer stock={selected} onClose={()=>{setSelected(null);setAi("")}} onAI={()=>askAI(selected.ticker)} ai={ai} aiLoading={aiLoading} watch={watch} setWatch={setWatch} portfolio={portfolio} setPortfolio={setPortfolio}/>}
