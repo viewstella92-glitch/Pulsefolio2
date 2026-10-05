@@ -103,6 +103,7 @@ function หุ้นDrawer({stock:s,onClose,onAI,ai,aiLoading,watch,setWatch,po
  <div className="actions2"><button className="primary" onClick={()=>setWatch(w=>isWatch?w.filter(x=>x!==s.ticker):[...w,s.ticker])}>{isWatch?"✓ ✓ อยู่ในรายการติดตาม":"+ + เพิ่มในรายการติดตาม"}</button><button className="secondary" onClick={onAI}>{aiLoading?"กำลังวิเคราะห์…":"ให้ Gemini วิเคราะห์"}</button></div>
  <div className="zone"><span className={"badge "+badgeClass(s.buy_zone)}>{s.buy_zone}</span><div><small>ช่วงมูลค่ายุติธรรม</small><b>{usd(s.fair_value_low)} / {usd(s.fair_value_base)} / {usd(s.fair_value_high)}</b></div></div>
  <InvestmentSnapshot stock={s} price={price} upside={upside}/>
+ <PriceScenario stock={s} price={price}/>
  <Block title="สถานะในพอร์ต"><div className="positionForm"><label>จำนวนหุ้น<input type="number" min="0" step="any" value={qty} onChange={e=>setQty(e.target.value)} placeholder="0"/></label><label>ต้นทุนเฉลี่ย<input type="number" min="0" step="any" value={avg} onChange={e=>setAvg(e.target.value)} placeholder="0.00"/></label><button className="primary" onClick={saveHolding}>บันทึกสถานะ</button></div></Block>
  <Block title="มูลค่า/ราคา"><Grid items={[["Forward P/E",s.forward_pe?fmt(s.forward_pe,1)+"x":"—"],["PEG",s.peg?fmt(s.peg,2):"—"],["Industry Fwd P/E",s.industry_forward_pe?fmt(s.industry_forward_pe,1)+"x":"—"],["Trailing P/E",s.trailing_pe?fmt(s.trailing_pe,1)+"x":"N/A"]]}/><div className="priceOutlook"><b>โอกาสราคาจากมูลค่ายุติธรรม</b><strong>{upside==null?"—":(upside>=0?"+":"")+fmt(upside,1)+"%"}</strong><small>คำนวณจากราคาปัจจุบันเทียบกับ Fair Value Base ไม่ใช่การรับประกันราคาหุ้น</small></div><AnalystTarget news={s.news||[]} price={price}/></Block>
  <Block title="โอกาสการเติบโต"><div className="growthHighlight"><strong>{pct(s.growth_next)}</strong><span>คาดการณ์การเติบโตของกำไรปีหน้า</span></div><Grid items={[["ปัจจุบัน",pct(s.growth_current)],["ปีหน้า",pct(s.growth_next)],["ระยะยาว",pct(s.growth_long)],["รายได้",pct(s.revenue_growth)]]}/></Block><Block title="ข่าวที่สนับสนุนการเติบโต"><PositiveNews news={s.news||[]}/></Block>
@@ -124,6 +125,28 @@ function InvestmentSnapshot({stock:s,price,upside}){
    <div><span>Fair Value Upside</span><b className={upside>=0?"up":"down"}>{upside==null?"—":(upside>=0?"+":"")+fmt(upside,1)+"%"}</b><small>เทียบมูลค่ายุติธรรม</small></div>
    <div><span>Analyst Target</span><b>{target?usd(target.target):"—"}</b><small>{target&&target.upside!=null?(target.upside>=0?"+":"")+fmt(target.upside,1)+"% จากราคาปัจจุบัน":"ยังไม่มีตัวเลขอ้างอิง"}</small></div>
   </div>
+ </section>
+}
+
+function PriceScenario({stock:s,price}){
+ const scenarios=[
+  ["Bear","กรณีลบ",s.fair_value_low,"มูลค่ายุติธรรมต่ำ", "down"],
+  ["Base","กรณีฐาน",s.fair_value_base,"มูลค่ายุติธรรมฐาน", "base"],
+  ["Bull","กรณีบวก",s.fair_value_high,"มูลค่ายุติธรรมสูง", "up"]
+ ];
+ const hasPrice=Number(price)>0;
+ return <section className="priceScenario">
+  <div className="scenarioHead"><div><span className="eyebrow">PRICE OUTLOOK</span><h3>กรอบราคาที่ควรใช้คิด</h3></div><small>ไม่ใช่การคาดการณ์ราคาแบบ AI</small></div>
+  <div className="scenarioGrid">{scenarios.map(([name,label,value,source,cls])=>{
+    const target=Number(value)>0&&hasPrice?((Number(value)/Number(price)-1)*100):null;
+    return <div className={"scenarioCard "+cls} key={name}>
+      <div className="scenarioTop"><b>{name}</b><span>{label}</span></div>
+      <strong>{Number(value)>0?usd(value):"—"}</strong>
+      <span className={target==null?"scenarioMissing":target>=0?"up":"down"}>{target==null?"ยังไม่มีข้อมูล":(target>=0?"+":"")+fmt(target,1)+"%"}</span>
+      <small>{source}</small>
+    </div>
+  })}</div>
+  <div className="scenarioNote"><b>วิธีอ่าน:</b> Bear / Base / Bull ใช้ Fair Value Low / Base / High ที่มีอยู่ในฐานข้อมูลเท่านั้น ระบบจะไม่สร้างราคาขึ้นเอง หากไม่มี Fair Value จะแสดง “ยังไม่มีข้อมูล”</div>
  </section>
 }
 
