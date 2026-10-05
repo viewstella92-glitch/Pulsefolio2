@@ -30,8 +30,8 @@ export async function POST(req){
     const found=results.find(x=>x.ticker===ticker);
     if(!found)return NextResponse.json({error:"ไม่พบหุ้นนี้ใน Yahoo Finance"},{status:404});
     const sync=await fetch("https://ailjqgahjjnlhlabooip.supabase.co/functions/v1/pulse-sync",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({tickers:[ticker]})});
-    if(!sync.ok)throw new Error((await sync.text())||"Stock sync failed");
-    await fetch("https://ailjqgahjjnlhlabooip.supabase.co/functions/v1/estimate-sync",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({tickers:[ticker]})});
-    return NextResponse.json({ok:true,stock:found});
+    const syncText=await sync.text();
+    const est=await fetch("https://ailjqgahjjnlhlabooip.supabase.co/functions/v1/estimate-sync",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({tickers:[ticker]})});
+    return NextResponse.json({ok:true,stock:found,syncOk:sync.ok,syncResult:syncText,estimateOk:est.ok});
   }catch(e){return NextResponse.json({error:e?.message||"Add stock failed"},{status:500});}
 }
