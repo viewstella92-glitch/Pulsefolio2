@@ -103,6 +103,19 @@ export default function Home(){
   const watchRows=ranked.filter(s=>watch.includes(s.ticker));
   const newsRows=search?news.filter(n=>(n.ticker+" "+n.title).toLowerCase().includes(search.toLowerCase())).slice(0,20):news.slice(0,12);
   const openStock=s=>setSelected({...s,news:news.filter(n=>n.ticker===s.ticker)});
+  async function removeStock(ticker){
+    if(!window.confirm("ลบ "+ticker+" ออกจากรายการหุ้นที่วิเคราะห์?"))return;
+    try{
+      const r=await fetch("/api/stocks/search",{method:"DELETE",headers:{"content-type":"application/json"},body:JSON.stringify({ticker})});
+      const d=await r.json();
+      if(!r.ok)throw new Error(d.error||"ลบหุ้นไม่สำเร็จ");
+      setWatch(w=>w.filter(x=>x!==ticker));
+      setพอร์ตลงทุน(p=>{const x={...p};delete x[ticker];return x});
+      setSelected(null);
+      setAi("");
+      await load();
+    }catch(e){setError(e?.message||"ลบหุ้นไม่สำเร็จ")}
+  }
   const portfolioRows=Object.entries(portfolio).map(([ticker,p])=>{const s=merged.find(x=>x.ticker===ticker);const price=Number(quotes[ticker]?.price||s?.price||0);const qty=Number(p.qty||0);const avg=Number(p.avg||0);return {...s,ticker,qty,avg,price,value:qty*price,cost:qty*avg,pnl:qty*(price-avg)}}).filter(x=>x.qty>0);
   const totalValue=portfolioRows.reduce((a,x)=>a+x.value,0),totalCost=portfolioRows.reduce((a,x)=>a+x.cost,0),totalPnl=totalValue-totalCost;
   async function earningsBrief(){setEarnLoading(true);try{const r=await fetch("/api/ai/earnings",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({earnings,stocks:ranked})});const d=await r.json();setEarnBrief(d.text||d.error||"AI ยังไม่ได้ส่งคำตอบ")}catch{setEarnBrief("เชื่อมต่อ AI ไม่สำเร็จ")}finally{setEarnLoading(false)}}
@@ -118,7 +131,7 @@ export default function Home(){
       {loading?<div className="loading">กำลังโหลดข้อมูลตลาด…</div>:error?<div className="errorCard"><b>ยังโหลดข้อมูลสกอร์ไม่ได้</b><span>{error}</span><button className="primary" onClick={load}>ลองใหม่</button><small>ถ้ายังไม่ขึ้น ปัญหาอยู่ที่การเชื่อมต่อ API ไม่ใช่หน้าแสดงผล</small></div>:tab==="home"?<HomeView stocks={ranked} buys={buys} portfolioRows={portfolioRows} totalValue={totalValue} totalPnl={totalPnl} news={newsRows} earnings={earnings} changes={changes} lastUpdate={lastUpdate} investmentPicks={investmentPicks} insights={insights} brief={brief} briefLoading={briefLoading} syncLoading={syncLoading} earnBrief={earnBrief} earnLoading={earnLoading} changeAI={changeAI} changeAILoading={changeAILoading} onBrief={askBrief} onEarningsBrief={earningsBrief} onExplainChange={explainChange} onSync={syncNow} onOpen={openStock} insights={insights} onRank={()=>setTab("rank")} onReload={load}/>:tab==="rank"?<Ranking rows={filtered} onOpen={openStock}/>:tab==="watch"?<รายการติดตาม rows={watchRows} onOpen={openStock}/>:<พอร์ตลงทุน rows={portfolioRows} totalValue={totalValue} totalCost={totalCost} totalPnl={totalPnl} onOpen={openStock}/>}
       <footer>ข้อมูลพื้นฐานและการวิเคราะห์ · ราคาตลาด: Yahoo Finance · ข่าวและงบ: Yahoo/Google · AI: Gemini</footer>
     </section>
-    {selected&&<หุ้นDrawer insights={insights[selected.ticker]} stock={selected} onClose={()=>{setSelected(null);setAi("")}} onAI={()=>askAI(selected.ticker)} ai={ai} aiLoading={aiLoading} watch={watch} setWatch={setWatch} portfolio={portfolio} setพอร์ตลงทุน={setพอร์ตลงทุน}/>}
+    {selected&&<หุ้นDrawer insights={insights[selected.ticker]} stock={selected} onClose={()=>{setSelected(null);setAi("")}} onAI={()=>askAI(selected.ticker)} ai={ai} aiLoading={aiLoading} watch={watch} setWatch={setWatch} portfolio={portfolio} setพอร์ตลงทุน={setพอร์ตลงทุน} onRemove={()=>removeStock(selected.ticker)}/>}
   </main>
 }
 
@@ -187,7 +200,7 @@ function พอร์ตลงทุน({rows,totalValue,totalCost,totalPnl,onOp
 
 function ข่าวItem({n}){return <a className="newsItem" href={n.url||"#"} target="_blank" rel="noreferrer"><span className="newsTicker">{n.ticker}</span><div><b>{n.title}</b><small>{n.source||"ข่าว"} · {n.publishedAt?dateShort(n.publishedAt):""}</small></div></a>}
 
-function หุ้นDrawer({insights:insight,stock:s,onClose,onAI,ai,aiLoading,watch,setWatch,portfolio,setพอร์ตลงทุน}){
+function หุ้นDrawer({insights:insight,stock:s,onClose,onAI,ai,aiLoading,watch,setWatch,portfolio,setพอร์ตลงทุน,onRemove}){
  const isWatch=watch.includes(s.ticker),[qty,setQty]=useState(portfolio[s.ticker]?.qty||""),[avg,setAvg]=useState(portfolio[s.ticker]?.avg||"");
  const price=Number(s.price||s.db_price||0),upside=s.fair_value_base&&price?((Number(s.fair_value_base)/price-1)*100):null;
  const pegReliable=!((s.industry||"").toLowerCase().includes("semiconductor")||((s.sector||"").toLowerCase().includes("consumer")&&Number(s.growth_current||0)>Number(s.growth_next||0)*1.8));
@@ -195,7 +208,7 @@ function หุ้นDrawer({insights:insight,stock:s,onClose,onAI,ai,aiLoading,
  return <div className="drawerBack" onMouseDown={onClose}><aside className="drawer" onMouseDown={e=>e.stopPropagation()}><button className="close" onClick={onClose}>×</button>
  <div className="drawerTop"><div><span className="eyebrow">{s.sector} · {s.industry}</span><h2>{s.ticker}</h2><p>{s.name}</p></div><div className={scoreClass(s.overall_score)}>{fmt(s.overall_score,0)}</div></div>
  <div className="priceLine"><strong>{usd(price)}</strong><span>มูลค่ายุติธรรม {usd(s.fair_value_base)}</span><span className={upside>=0?"up":"down"}>{upside==null?"—":(upside>=0?"+":"")+fmt(upside,1)+"%"}</span></div><div className="freshness">อัปเดตข้อมูล {s.updated_at?new Date(s.updated_at).toLocaleString("en-US",{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"}):"—"} · {s.data_source||"Supabase"}</div>
- <div className="actions2"><button className="primary" onClick={()=>setWatch(w=>isWatch?w.filter(x=>x!==s.ticker):[...w,s.ticker])}>{isWatch?"✓ ✓ อยู่ในรายการติดตาม":"+ + เพิ่มในรายการติดตาม"}</button><button className="secondary" onClick={onAI}>{aiLoading?"กำลังวิเคราะห์…":"ให้ Gemini วิเคราะห์"}</button></div>
+ <div className="actions2"><button className="primary" onClick={()=>setWatch(w=>isWatch?w.filter(x=>x!==s.ticker):[...w,s.ticker])}>{isWatch?"✓ ✓ อยู่ในรายการติดตาม":"+ + เพิ่มในรายการติดตาม"}</button><button className="secondary" onClick={onAI}>{aiLoading?"กำลังวิเคราะห์…":"ให้ Gemini วิเคราะห์"}</button><button className="dangerBtn" onClick={onRemove}>ลบหุ้นออก</button></div>
  <div className="zone"><span className={"badge "+badgeClass(s.buy_zone)}>{s.buy_zone}</span><div><small>ช่วงมูลค่ายุติธรรม</small><b>{usd(s.fair_value_low)} / {usd(s.fair_value_base)} / {usd(s.fair_value_high)}</b></div></div>
  <InvestmentSnapshot stock={s} price={price} upside={upside}/>
  <GrowthValuationFit stock={s}/>
