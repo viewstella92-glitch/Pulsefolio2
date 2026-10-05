@@ -2,14 +2,10 @@ import { NextResponse } from "next/server";
 
 export const runtime="nodejs";
 
-export async function GET(req){
-  const secret=process.env.CRON_SECRET;
-  const auth=req.headers.get("authorization")||"";
-  if(!secret || auth !== "Bearer "+secret) return NextResponse.json({error:"Unauthorized"},{status:401});
+export async function GET(){
   try{
     const r=await fetch("https://ailjqgahjjnlhlabooip.supabase.co/functions/v1/pulse-sync",{
       method:"POST",
-      headers:{"x-pulse-sync-secret":secret},
       cache:"no-store"
     });
     const data=await r.json();
