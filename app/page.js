@@ -94,7 +94,9 @@ export default function Home(){
   const merged=useMemo(()=>stocks.map(s=>({...s,...(quotes[s.ticker]||{}),db_price:s.price})),[stocks,quotes]);
   const ranked=useMemo(()=>[...merged].sort((a,b)=>Number(b.overall_score||0)-Number(a.overall_score||0)),[merged]);
   const filtered=ranked.filter(s=>(s.ticker+" "+s.name).toLowerCase().includes(search.toLowerCase()));
-  const decisions=useMemo(()=>merged.map(s=>({...s,investmentDecision:investmentDecision(s)})).sort((a,b)=>b.investmentDecision.score-a.investmentDecision.score),[merged]);\n  const investmentPicks=decisions.slice(0,5);\n  const buys=ranked.filter(s=>["BUY","STRONG BUY"].includes(s.buy_zone)).slice(0,5);
+  const decisions=useMemo(()=>merged.map(s=>({...s,investmentDecision:investmentDecision(s)})).sort((a,b)=>b.investmentDecision.score-a.investmentDecision.score),[merged]);
+  const investmentPicks=decisions.slice(0,5);
+  const buys=ranked.filter(s=>["BUY","STRONG BUY"].includes(s.buy_zone)).slice(0,5);
   const watchRows=ranked.filter(s=>watch.includes(s.ticker));
   const newsRows=search?news.filter(n=>(n.ticker+" "+n.title).toLowerCase().includes(search.toLowerCase())).slice(0,20):news.slice(0,12);
   const openStock=s=>setSelected({...s,news:news.filter(n=>n.ticker===s.ticker)});
