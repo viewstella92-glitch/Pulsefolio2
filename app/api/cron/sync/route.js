@@ -9,7 +9,12 @@ export async function GET(){
       cache:"no-store"
     });
     const data=await r.json();
-    return NextResponse.json(data,{status:r.status});
+    const e=await fetch("https://ailjqgahjjnlhlabooip.supabase.co/functions/v1/estimate-sync",{
+      method:"POST",
+      cache:"no-store"
+    });
+    const estimates=await e.json().catch(()=>({}));
+    return NextResponse.json({...data,estimates},{status:r.ok&&e.ok?200:207});
   }catch(e){
     return NextResponse.json({error:e?.message||"Sync failed"},{status:500});
   }
