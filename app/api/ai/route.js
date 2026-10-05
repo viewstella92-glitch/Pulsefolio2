@@ -1,17 +1,15 @@
 export async function POST(req){
   const key=process.env.GEMINI_API_KEY;
-  if(!key) return Response.json({error:"AI ยังไม่ได้เชื่อมต่อ: กรุณาเพิ่ม GEMINI_API_KEY ใน Vercel Environment Variables"});
-  const {ticker,data}=await req.json();
-  if(!data) return Response.json({error:"No stock data"},{status:400});
-  const prompt=`You are the investment-analysis assistant inside a personal US stock dashboard. Analyze ${ticker} using ONLY the supplied structured data. Do not invent missing numbers. Explain in Thai, concise and practical. Discuss valuation (Forward P/E, PEG, industry P/E, fair value), growth, quality, risk, buy zone, and whether PEG is reliable for this company. If data is missing, say it is missing. Do not give a guaranteed price target or personalized financial advice. Data: ${JSON.stringify(data)}`;
+  if(!key) return Response.json({error:"ยังไม่ได้ตั้งค่า GEMINI_API_KEY ใน Vercel"},{status:500});
   try{
-    const r=await fetch("https://generativelanguage.googleapis.com/v1beta/interactions",{
-      method:"POST",
-      headers:{"Content-Type":"application/json","x-goog-api-key":key},
-      body:JSON.stringify({model:"gemini-3.8-flash",input:prompt})
-    });
+    const {ticker,data}=await req.json();
+    if(!data) return Response.json({error:"ไม่พบข้อมูลหุ้น"},{status:400});
+    const prompt=`คุณเป็นผู้ช่วยวิเคราะห์หุ้น US ในแดชบอร์ดส่วนตัว วิเคราะห์ ${ticker} โดยใช้เฉพาะข้อมูลที่ให้มา ห้ามสร้างตัวเลขเอง ตอบเป็นภาษาไทย กระชับ ใช้งานได้จริง ครอบคลุม valuation (Forward P/E, PEG, industry P/E, fair value), growth, quality, risk, buy zone และความน่าเชื่อถือของ PEG หากข้อมูลขาดให้ระบุว่าขาด ห้ามรับประกันผลตอบแทนหรือให้คำแนะนำเฉพาะบุคคล ข้อมูล: ${JSON.stringify(data)}`;
+    const r=await fetch("https://generativelanguage.googleapis.com/v1beta/interactions",{method:"POST",headers:{"Content-Type":"application/json","x-goog-api-key":key},body:JSON.stringify({model:"gemini-3.8-flash",input:prompt})});
     const d=await r.json();
-    if(!r.ok) return Response.json({error:d.error?.message||"Gemini request failed"},{status:500});
-    return Response.json({text:const text=d.steps?.flatMap(s=>s.content||[]).filter(c=>c.type==="text").map(c=>c.text||"").join("")||d.output_text||"AI ไม่ได้ส่งคำตอบกลับมา";});
-  }catch(e){return Response.json({error:e.message||"AI request failed"},{status:500})}
+    if(!r.ok) return Response.json({error:d.error?.message||`Gemini API error: ${r.status}`},{status:500});
+    const text=d.output_text||d.steps?.flatMap(s=>s.content||[]).filter(c=>c.type==="text").map(c=>c.text||"").join("")||"";
+    if(!text) return Response.json({error:"Gemini ตอบกลับมาแต่ไม่มีข้อความ",detail:{status:d.status,steps:d.steps?.length||0}},{status:502});
+    return Response.json({text});
+  }catch(e){return Response.json({error:e?.message||"เชื่อมต่อ Gemini ไม่สำเร็จ"},{status:500})}
 }
