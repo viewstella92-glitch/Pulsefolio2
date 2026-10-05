@@ -19,6 +19,24 @@ export async function GET(req){
   catch(e){return NextResponse.json({error:e?.message||"Search failed"},{status:500});}
 }
 
+export async function DELETE(req){
+  const body=await req.json().catch(()=>({}));
+  const ticker=String(body?.ticker||"").trim().toUpperCase();
+  if(!/^[A-Z.\-]{1,10}$/.test(ticker))return NextResponse.json({error:"Invalid ticker"},{status:400});
+  try{
+    const key=process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+    const sync=await fetch("https://ailjqgahjjnlhlabooip.supabase.co/functions/v1/pulse-sync",{
+      method:"POST",
+      headers:{"content-type":"application/json",...(key?{"apikey":key,"Authorization":"Bearer "+key}:{})},
+      body:JSON.stringify({removeTickers:[ticker]})
+    });
+    const text=await sync.text();
+    const result=text?JSON.parse(text):null;
+    if(!sync.ok||result?.failed>0)return NextResponse.json({ok:false,error:result?.errors?.[0]?.error||"ลบหุ้นไม่สำเร็จ",result},{status:502});
+    return NextResponse.json({ok:true,ticker,result});
+  }catch(e){return NextResponse.json({error:e?.message||"Remove stock failed"},{status:500});}
+}
+
 export async function POST(req){
   const body=await req.json().catch(()=>({}));
   const ticker=String(body?.ticker||"").trim().toUpperCase();
@@ -29,7 +47,7 @@ export async function POST(req){
     const results=await yahooSearch(ticker);
     const found=results.find(x=>x.ticker===ticker);
     if(!found)return NextResponse.json({error:"ไม่พบหุ้นนี้ใน Yahoo Finance"},{status:404});
-    const sync=await fetch("https://ailjqgahjjnlhlabooip.supabase.co/functions/v1/pulse-sync",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({tickers:[ticker]})});
+    const sync=await fetch("https://ailjqgahjjnlhlabooip.supabase.co/functions/v1/pulse-sync",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({tickers:[ticker],metadata:{[ticker]:found}})});
     const syncText=await sync.text();
     const syncResult=syncText ? JSON.parse(syncText) : null;
     if(!sync.ok || syncResult?.failed>0){
