@@ -2,7 +2,7 @@ import "./globals.css";
 
 export const metadata = {
   title: "Pulsefolio — Stock Tracker",
-  description: "Personal portfolio and stock watchlist tracker"
+  description: "Personal US stock analysis dashboard"
 };
 
 export default function RootLayout({ children }) {
