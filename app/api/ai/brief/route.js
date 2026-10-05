@@ -12,6 +12,6 @@ export async function POST(req){
     });
     const d=await r.json();
     if(!r.ok)return Response.json({error:d.error?.message||"Gemini request failed"},{status:500});
-    return Response.json({text:d.output_text||"AI ไม่ได้ส่งคำตอบกลับมา"});
+    return Response.json({text:const text=d.steps?.flatMap(s=>s.content||[]).filter(c=>c.type==="text").map(c=>c.text||"").join("")||d.output_text||"AI ไม่ได้ส่งคำตอบกลับมา";});
   }catch(e){return Response.json({error:e?.message||"AI brief failed"},{status:500})}
 }
