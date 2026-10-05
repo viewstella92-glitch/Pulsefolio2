@@ -29,7 +29,7 @@ export async function GET(){
       if(x.buy_zone!==p.buy_zone) reasons.push((p.buy_zone||"—")+" → "+(x.buy_zone||"—"));
       if(x.forward_pe!=null&&p.forward_pe!=null&&Math.abs(Number(x.forward_pe)-Number(p.forward_pe))>=2) reasons.push("Forward P/E changed");
       if(x.peg!=null&&p.peg!=null&&Math.abs(Number(x.peg)-Number(p.peg))>=0.2) reasons.push("PEG changed");
-      return {...x,score_change:scoreChange,price_change_pct:priceChange,reason:reasons.length?reasons.join(" · "):"No material score change"};
+      return {...x,score_change:scoreChange,price_change_pct:priceChange,reason:reasons.length?reasons.join(" · "):"No material score change",current:x,previous:p};
     }).sort((a,b)=>Math.abs(Number(b.score_change||0))-Math.abs(Number(a.score_change||0)));
     return NextResponse.json({changes:changes.slice(0,12),lastUpdate:logs?.[0]||null,updatedAt:new Date().toISOString()});
   }catch(e){return NextResponse.json({error:e?.message||"Changes API failed"},{status:500})}
