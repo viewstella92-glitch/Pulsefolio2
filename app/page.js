@@ -130,12 +130,14 @@ export default function Home() {
       {tab==="watchlist" && <Watchlist watchlist={watchlist} quotes={quotes} setWatchlist={setWatchlist}/>}
       {tab==="alerts" && <Alerts alerts={alerts} setAlerts={setAlerts} quotes={quotes} />}
 
-      <footer>Data refreshes from market data when available · {lastUpdated ? `Updated ${lastUpdated.toLocaleTimeString()}` : "Waiting for first refresh"}</footer>
+      <AIInsights/><footer>Data refreshes from market data when available · {lastUpdated ? `Updated ${lastUpdated.toLocaleTimeString()}` : "Waiting for first refresh"}</footer>
     </section>
 
     {modal==="holding" && <div className="overlay" onMouseDown={()=>setModal(null)}><form className="modal" onSubmit={addHolding} onMouseDown={e=>e.stopPropagation()}><div className="modalhead"><div><span className="eyebrow">PORTFOLIO</span><h2>Add position</h2></div><button type="button" className="iconbtn" onClick={()=>setModal(null)}><X size={18}/></button></div><label>Ticker<input name="symbol" placeholder="e.g. NVDA" required/></label><div className="twocol"><label>Shares<input name="shares" type="number" step="any" min="0.0001" placeholder="10" required/></label><label>Average cost<input name="avg" type="number" step="any" min="0" placeholder="120" required/></label></div><button className="primary wide">Add to portfolio</button></form></div>}
   </main>;
 }
+
+function AIInsights(){const [data,setData]=useState([]);useEffect(()=>{fetch("/api/analysis").then(r=>r.ok?r.json():[]).then(setData).catch(()=>{})},[]);return <section className="panel"><div className="panelhead"><div><span className="eyebrow">AI INVESTMENT ENGINE</span><h2>Valuation-adjusted opportunities</h2></div><span className="count">{data.length} stocks</span></div><div className="aiGrid">{data.slice(0,6).map(x=><div className="aiCard" key={x.ticker}><b>{x.ticker}</b><strong>{Number(x.overall_score||0).toFixed(0)}</strong><span>{x.buy_zone}</span><small>{x.explanation}</small></div>)}</div></section>}
 
 function Overview({holdings,totalValue,totalPnl,totalPnlPct,dayPnl,quotes,watchlist,setWatchlist,setTab}) {
   const top=holdings.slice().sort((a,b)=>b.value-a.value).slice(0,5);
