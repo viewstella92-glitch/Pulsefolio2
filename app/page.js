@@ -131,9 +131,38 @@ function HomeView({stocks,buys,investmentPicks,insights,portfolioRows,totalValue
  <section className="section intelligence"><div className="intelHead"><div><span className="eyebrow">AI INVESTMENT BRIEF</span><h3>สิ่งที่สำคัญตอนนี้</h3></div><button className="primary" onClick={onBrief}>{briefLoading?"กำลังวิเคราะห์…":"สร้างสรุปด้วย AI"}</button></div>{brief?<div className="brief">{brief}</div>:<div className="empty compact">กด สร้างสรุปด้วย AI เพื่อให้ Gemini สรุปภาพรวมจากข้อมูลใน Dashboard โดยไม่เติมตัวเลขเอง</div>}</section>
  <section className="section"><SectionHead title="มีอะไรเปลี่ยนจากครั้งก่อน" action={changes.length?changes.length+" signals":"ยังไม่มีการเปลี่ยนแปลง"}/>{changes.length?<div className="changes">{changes.slice(0,6).map(x=><ChangeItem key={x.ticker} x={x} ai={changeAI[x.ticker]} loading={changeAILoading===x.ticker} onExplain={onExplainChange}/>)}</div>:<div className="empty compact">ยังไม่มี snapshot ก่อนหน้า ระบบจะเริ่มเก็บประวัติหลังการ sync ครั้งถัดไป</div>}</section>
  <section className="section"><SectionHead title="ข่าวตลาด" action={news.length?news.length+" ข่าว":""}/>{news.length?<div className="newsList">{news.map((n,i)=><ข่าวItem key={n.url||i} n={n}/>)}</div>:<div className="empty">ยังไม่มีข่าวจากแหล่งข้อมูลฟรีในขณะนี้</div>}</section>
- <section className="section"><div className="intelHead"><div><span className="eyebrow">วิเคราะห์ช่วงประกาศงบ</span><h3>อะไรที่ควรจับตา</h3></div><button className="primary" onClick={onEarningsBrief}>{earnLoading?"กำลังวิเคราะห์…":"วิเคราะห์งบ"}</button></div>{earnBrief&&<div className="brief">{earnBrief}</div>}<SectionHead title="กำหนดประกาศงบ" action={earnings.length?earnings.length+" รายการ":"ไม่มีข้อมูล"}/>{earnings.length?<div className="earnGrid">{earnings.slice(0,8).map(e=><div className="earnCard" key={e.ticker}><b>{e.ticker}</b><span>{dateShort(e.date)} {e.ประมาณการd?"· ประมาณการ":""}</span>{e.epsAverage!=null&&<small>EPS ประมาณการ {fmt(e.epsAverage,2)}</small>}</div>)}</div>:<div className="notice">Earnings dates could not be fetched right now. The app will retry on refresh; no dates are invented.</div>}</section>
+ <section className="section"><div className="intelHead"><div><span className="eyebrow">EARNINGS INTELLIGENCE</span><h3>ผลประกอบการ · Surprise · Guidance</h3></div><button className="primary" onClick={onEarningsBrief}>{earnLoading?"กำลังวิเคราะห์…":"วิเคราะห์งบ"}</button></div>{earnBrief&&<div className="brief">{earnBrief}</div>}<EarningsTracker earnings={earnings} news={news}/></section>
  <section className="section"><SectionHead title="คะแนนลงทุนคำนวณอย่างไร"/><div className="scoreExplain"><Explain n="35%" t="มูลค่า/ราคา" d="Forward P/E, PEG and price vs fair value."/><Explain n="30%" t="การเติบโต" d="ปัจจุบัน, next-year and long-term growth."/><Explain n="20%" t="คุณภาพ" d="ROE, margin and financial strength."/><Explain n="10%" t="ความเสี่ยง" d="Beta, cyclicality and valuation risk."/><Explain n="5%" t="ข่าว" d="Reserved for real news sentiment; current base score does not pretend placeholder news is live." /></div></section>
  <div className="notice"><b>กฎข้อมูล:</b> ข้อมูลที่ไม่มีจะแสดงเป็น “—” และ AI จะไม่สร้างตัวเลขพื้นฐานขึ้นเอง ราคาจาก Yahoo อาจมีความล่าช้า</div></div>
+}
+function EarningsTracker({earnings,news}){
+ const rows=earnings.map(e=>{
+   const hist=(e.history||[]).filter(x=>x.epsActual!=null&&x.epsEstimate!=null);
+   const latest=hist[0];
+   const beats=hist.filter(x=>x.surprisePercent!=null&&x.surprisePercent>0).length;
+   const misses=hist.filter(x=>x.surprisePercent!=null&&x.surprisePercent<0).length;
+   const avgSurprise=hist.length?hist.reduce((a,x)=>a+Number(x.surprisePercent||0),0)/hist.length:null;
+   const tickerNews=(news||[]).filter(n=>n.ticker===e.ticker).slice(0,12);
+   const guidanceItems=tickerNews.filter(n=>/guidance|outlook|forecast|expects|expectation|raised|raises|lowered|cuts|cut|ลดคาดการณ์|เพิ่มคาดการณ์|ปรับคาดการณ์/i.test((n.title||"")+" "+(n.summary||"")));
+   let guidance="ยังไม่พบสัญญาณ"; let guidanceTone="neutral";
+   if(guidanceItems.length){
+     const text=guidanceItems.map(n=>(n.title||"")+" "+(n.summary||"")).join(" ");
+     if(/lowered|cuts|cut|reduce|reduced|downside|ลดคาดการณ์|ปรับลด/i.test(text)){guidance="มีสัญญาณ Guidance ลดลง";guidanceTone="down"}
+     else if(/raised|raises|increase|increased|upside|เพิ่มคาดการณ์|ปรับเพิ่ม/i.test(text)){guidance="มีสัญญาณ Guidance เพิ่มขึ้น";guidanceTone="up"}
+     else guidance="พบข่าว Guidance / Outlook";
+   }
+   return {...e,latest,beats,misses,avgSurprise,guidance,guidanceTone,guidanceSource:guidanceItems[0]?.source||null};
+ }).sort((a,b)=>{const ad=a.date?new Date(a.date).getTime():Infinity,bd=b.date?new Date(b.date).getTime():Infinity;return ad-bd;});
+ return <div className="earningsTracker">
+  <div className="earningsTrackerNote">Beat/Miss ใช้ EPS Actual เทียบกับ EPS Estimate จาก Yahoo Finance ส่วน Guidance เป็นสัญญาณจากข่าวล่าสุดของหุ้น — ถ้าไม่มีหลักฐานจะไม่เดาตัวเลขหรือสถานะ</div>
+  {rows.length?<div className="earningsIntelGrid">{rows.slice(0,10).map(e=><div className="earnIntelCard" key={e.ticker}>
+    <div className="earnIntelTop"><div><b>{e.ticker}</b><small>{e.date?dateShort(e.date):"ยังไม่ทราบวัน"}{e.estimated?" · ประมาณการ":""}</small></div>{e.latest?.surprisePercent!=null?<span className={e.latest.surprisePercent>0?"up":e.latest.surprisePercent<0?"down":"neutral"}>{e.latest.surprisePercent>0?"BEAT":e.latest.surprisePercent<0?"MISS":"MEET"}</span>:<span className="neutral">ยังไม่มีผลล่าสุด</span>}</div>
+    <div className="earnMetricRow"><span>EPS ล่าสุด <b>{e.latest?.epsActual!=null?fmt(e.latest.epsActual,2):"—"}</b></span><span>คาด <b>{e.latest?.epsEstimate!=null?fmt(e.latest.epsEstimate,2):"—"}</b></span><span>Surprise <b className={e.latest?.surprisePercent>=0?"up":"down"}>{e.latest?.surprisePercent!=null?(e.latest.surprisePercent>=0?"+":"")+fmt(e.latest.surprisePercent,1)+"%":"—"}</b></span></div>
+    <div className="earnMetricRow"><span>8 งบล่าสุด <b>{e.beats} Beat</b></span><span>{e.misses} Miss</span><span>Avg <b>{e.avgSurprise!=null?(e.avgSurprise>=0?"+":"")+fmt(e.avgSurprise,1)+"%":"—"}</b></span></div>
+    <div className="guidanceSignal"><span>Guidance / Outlook</span><b className={e.guidanceTone}>{e.guidance}</b><small>{e.guidanceSource?"จาก "+e.guidanceSource:"ไม่มีข่าวอ้างอิงเพียงพอ"}</small></div>
+    {e.epsAverage!=null&&<small className="earnNext">งวดถัดไป: EPS consensus {fmt(e.epsAverage,2)}{e.revenueAverage!=null?" · Revenue "+fmt(e.revenueAverage,0):""}</small>}
+  </div>)}</div>:<div className="notice">ยังดึงข้อมูล Earnings ไม่ได้ ระบบจะลองใหม่เมื่อ Refresh และจะไม่สร้างข้อมูลขึ้นเอง</div>}
+ </div>
 }
 function ChangeItem({x,ai,loading,onExplain}){const sc=Number(x.score_change||0),pc=Number(x.price_change_pct||0);return <div className="changeItem"><div><b>{x.ticker}</b><span>{x.reason}</span>{ai&&<p className="changeAI">{ai}</p>}<button className="changeExplain" onClick={()=>onExplain(x)}>{loading?"กำลังวิเคราะห์…":ai?"วิเคราะห์อีกครั้ง":"ทำไมคะแนนเปลี่ยน?"}</button></div><strong className={sc>=0?"up":"down"}>{x.score_change==null?"—":(sc>=0?"+":"")+fmt(sc,1)+" pts"}</strong><small className={pc>=0?"up":"down"}>{x.price_change_pct==null?"":(pc>=0?"+":"")+fmt(pc,1)+"%"}</small></div>}
 function Explain({n,t,d}){return <div className="explain"><strong>{n}</strong><b>{t}</b><span>{d}</span></div>}
