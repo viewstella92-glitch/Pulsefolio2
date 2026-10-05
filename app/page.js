@@ -75,17 +75,17 @@ export default function Home(){
   const [stocks,setหุ้นs]=useState([]),[tab,setTab]=useState("home"),[selected,setSelected]=useState(null),[search,setSearch]=useState("");
   const [loading,setLoading]=useState(true),[error,setError]=useState(""),[ai,setAi]=useState(""),[aiLoading,setAiLoading]=useState(false),[watch,setWatch]=useState([]);
   const [quotes,setQuotes]=useState({}),[news,setข่าว]=useState([]),[earnings,setEarnings]=useState([]),[portfolio,setพอร์ตลงทุน]=useState({});
-  const [changes,setChanges]=useState([]),[lastUpdate,setLastUpdate]=useState(null),[brief,setBrief]=useState(""),[briefLoading,setBriefLoading]=useState(false),[syncLoading,setSyncLoading]=useState(false),[earnBrief,setEarnBrief]=useState(""),[earnLoading,setEarnLoading]=useState(false),[changeAI,setChangeAI]=useState({}),[changeAILoading,setChangeAILoading]=useState("");
+  const [changes,setChanges]=useState([]),[insights,setInsights]=useState({}),[lastUpdate,setLastUpdate]=useState(null),[brief,setBrief]=useState(""),[briefLoading,setBriefLoading]=useState(false),[syncLoading,setSyncLoading]=useState(false),[earnBrief,setEarnBrief]=useState(""),[earnLoading,setEarnLoading]=useState(false),[changeAI,setChangeAI]=useState({}),[changeAILoading,setChangeAILoading]=useState("");
   const load=async()=>{
     setLoading(true);
     try{
-      const [s,q,n,e,ch]=await Promise.all([fetch("/api/stocks",{cache:"no-store"}),fetch("/api/market",{cache:"no-store"}),fetch("/api/news",{cache:"no-store"}),fetch("/api/earnings",{cache:"no-store"}),fetch("/api/changes",{cache:"no-store"})]);
-      const sd=await s.json(),qd=await q.json(),nd=await n.json(),ed=await e.json(),cd=await ch.json();
+      const [s,q,n,e,ch,ins]=await Promise.all([fetch("/api/stocks",{cache:"no-store"}),fetch("/api/market",{cache:"no-store"}),fetch("/api/news",{cache:"no-store"}),fetch("/api/earnings",{cache:"no-store"}),fetch("/api/changes",{cache:"no-store"}),fetch("/api/insights",{cache:"no-store"})]);
+      const sd=await s.json(),qd=await q.json(),nd=await n.json(),ed=await e.json(),cd=await ch.json(),id=await ins.json();
       if(!s.ok || sd.error) throw new Error(sd.error||"โหลดข้อมูลหุ้นไม่สำเร็จ");
       setหุ้นs(sd.stocks||[]);
       setError("");
       setQuotes(Object.fromEntries((qd.quotes||[]).map(x=>[x.ticker,x])));
-      setข่าว(nd.news||[]);setEarnings(ed.earnings||[]);setChanges(cd.changes||[]);setLastUpdate(cd.lastUpdate||null);
+      setข่าว(nd.news||[]);setEarnings(ed.earnings||[]);setChanges(cd.changes||[]);setInsights(id.insights||{});setLastUpdate(cd.lastUpdate||null);
     }catch(e){setError(e?.message||"ไม่สามารถโหลดข้อมูลได้")}finally{setLoading(false)}
   };
   useEffect(()=>{load();try{setWatch(JSON.parse(localStorage.getItem("pulse-watch")||"[]"));setพอร์ตลงทุน(JSON.parse(localStorage.getItem("pulse-portfolio")||"{}"))}catch{}},[]);
@@ -110,10 +110,10 @@ export default function Home(){
       <Nav active={tab==="home"} onClick={()=>setTab("home")}>ภาพรวม</Nav><Nav active={tab==="rank"} onClick={()=>setTab("rank")}>จัดอันดับหุ้น</Nav><Nav active={tab==="watch"} onClick={()=>setTab("watch")}>รายการติดตาม <em>{watch.length}</em></Nav><Nav active={tab==="portfolio"} onClick={()=>setTab("portfolio")}>พอร์ตลงทุน <em>{portfolioRows.length}</em></Nav>
     </nav><div className="method"><span>โมเดลวิเคราะห์</span><b>มูลค่า/ราคา 35%</b><b>การเติบโต 30%</b><b>คุณภาพ 20%</b><b>ความเสี่ยง 10%</b><b>ข่าว 5%</b><small>ราคาตลาดอาจมีความล่าช้า</small></div></aside>
     <section className="main"><header className="header"><div><span className="eyebrow">แดชบอร์ดการลงทุนส่วนตัว</span><h1>{tab==="home"?"ภาพรวมตลาด":tab==="rank"?"จัดอันดับหุ้น":tab==="watch"?"รายการติดตาม":"พอร์ตลงทุน"}</h1></div><div className="searchbox">⌕<input value={search} onChange={e=>setSearch(e.target.value)} placeholder="ค้นหาชื่อหุ้นหรือบริษัท"/></div></header>
-      {loading?<div className="loading">กำลังโหลดข้อมูลตลาด…</div>:error?<div className="errorCard"><b>ยังโหลดข้อมูลสกอร์ไม่ได้</b><span>{error}</span><button className="primary" onClick={load}>ลองใหม่</button><small>ถ้ายังไม่ขึ้น ปัญหาอยู่ที่การเชื่อมต่อ API ไม่ใช่หน้าแสดงผล</small></div>:tab==="home"?<HomeView stocks={ranked} buys={buys} portfolioRows={portfolioRows} totalValue={totalValue} totalPnl={totalPnl} news={newsRows} earnings={earnings} changes={changes} lastUpdate={lastUpdate} investmentPicks={investmentPicks} brief={brief} briefLoading={briefLoading} syncLoading={syncLoading} earnBrief={earnBrief} earnLoading={earnLoading} changeAI={changeAI} changeAILoading={changeAILoading} onBrief={askBrief} onEarningsBrief={earningsBrief} onExplainChange={explainChange} onSync={syncNow} onOpen={openStock} onRank={()=>setTab("rank")} onReload={load}/>:tab==="rank"?<Ranking rows={filtered} onOpen={openStock}/>:tab==="watch"?<รายการติดตาม rows={watchRows} onOpen={openStock}/>:<พอร์ตลงทุน rows={portfolioRows} totalValue={totalValue} totalCost={totalCost} totalPnl={totalPnl} onOpen={openStock}/>}
+      {loading?<div className="loading">กำลังโหลดข้อมูลตลาด…</div>:error?<div className="errorCard"><b>ยังโหลดข้อมูลสกอร์ไม่ได้</b><span>{error}</span><button className="primary" onClick={load}>ลองใหม่</button><small>ถ้ายังไม่ขึ้น ปัญหาอยู่ที่การเชื่อมต่อ API ไม่ใช่หน้าแสดงผล</small></div>:tab==="home"?<HomeView stocks={ranked} buys={buys} portfolioRows={portfolioRows} totalValue={totalValue} totalPnl={totalPnl} news={newsRows} earnings={earnings} changes={changes} lastUpdate={lastUpdate} investmentPicks={investmentPicks} insights={insights} brief={brief} briefLoading={briefLoading} syncLoading={syncLoading} earnBrief={earnBrief} earnLoading={earnLoading} changeAI={changeAI} changeAILoading={changeAILoading} onBrief={askBrief} onEarningsBrief={earningsBrief} onExplainChange={explainChange} onSync={syncNow} onOpen={openStock} insights={insights} onRank={()=>setTab("rank")} onReload={load}/>:tab==="rank"?<Ranking rows={filtered} onOpen={openStock}/>:tab==="watch"?<รายการติดตาม rows={watchRows} onOpen={openStock}/>:<พอร์ตลงทุน rows={portfolioRows} totalValue={totalValue} totalCost={totalCost} totalPnl={totalPnl} onOpen={openStock}/>}
       <footer>ข้อมูลพื้นฐานและการวิเคราะห์ · ราคาตลาด: Yahoo Finance · ข่าวและงบ: Yahoo/Google · AI: Gemini</footer>
     </section>
-    {selected&&<หุ้นDrawer stock={selected} onClose={()=>{setSelected(null);setAi("")}} onAI={()=>askAI(selected.ticker)} ai={ai} aiLoading={aiLoading} watch={watch} setWatch={setWatch} portfolio={portfolio} setพอร์ตลงทุน={setพอร์ตลงทุน}/>}
+    {selected&&<หุ้นDrawer insights={insights[selected.ticker]} stock={selected} onClose={()=>{setSelected(null);setAi("")}} onAI={()=>askAI(selected.ticker)} ai={ai} aiLoading={aiLoading} watch={watch} setWatch={setWatch} portfolio={portfolio} setพอร์ตลงทุน={setพอร์ตลงทุน}/>}
   </main>
 }
 
@@ -121,11 +121,11 @@ function Nav({active,onClick,children}){return <button className={active?"nav ac
 function Metric({label,value,sub}){return <div className="metric"><span>{label}</span><strong>{value}</strong>{sub&&<small>{sub}</small>}</div>}
 function SectionHead({title,action,onClick}){return <div className="sectionHead"><h3>{title}</h3>{action&&<button onClick={onClick}>{action}</button>}</div>}
 
-function HomeView({stocks,buys,investmentPicks,portfolioRows,totalValue,totalPnl,news,earnings,changes,lastUpdate,brief,briefLoading,syncLoading,earnBrief,earnLoading,changeAI,changeAILoading,onBrief,onEarningsBrief,onExplainChange,onSync,onOpen,onRank,onReload}){
+function HomeView({stocks,buys,investmentPicks,insights,portfolioRows,totalValue,totalPnl,news,earnings,changes,lastUpdate,brief,briefLoading,syncLoading,earnBrief,earnLoading,changeAI,changeAILoading,onBrief,onEarningsBrief,onExplainChange,onSync,onOpen,onRank,onReload}){
  const avg=stocks.length?stocks.reduce((a,s)=>a+Number(s.overall_score||0),0)/stocks.length:0;
  return <div className="home"><div className="hero"><div><span className="eyebrow">เครื่องมือวิเคราะห์การลงทุน</span><h2>ค้นหาธุรกิจที่ดีในราคาที่เหมาะสม</h2><p>มูลค่า/ราคา, ระบบรวมมูลค่า การเติบโต คุณภาพ ความเสี่ยง และมูลค่ายุติธรรมเพื่อจัดอันดับหุ้น</p><div className="heroActions"><button className="primary" onClick={onRank}>ดูอันดับหุ้น</button><button className="secondary" onClick={onReload}>อัปเดตราคาและข่าว</button><button className="secondary" onClick={onSync}>{syncLoading?"กำลังซิงก์…":"ซิงก์ข้อมูลพื้นฐาน"}</button></div></div><div className="heroคะแนน"><span>คะแนนภาพรวม</span><strong>{fmt(avg,0)}</strong><small>/ 100</small></div></div>
  <div className="metrics"><Metric label="หุ้นที่วิเคราะห์" value={stocks.length}/><Metric label="โซนซื้อ" value={stocks.filter(s=>["BUY","STRONG BUY"].includes(s.buy_zone)).length}/><Metric label="สถานะข้อมูล" value={lastUpdate?.status==="success"?"อัปเดตอัตโนมัติ":"พร้อมใช้งาน"} sub={lastUpdate?.finished_at?"ซิงก์ล่าสุด "+new Date(lastUpdate.finished_at).toLocaleString("en-US",{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"}):"เปิดอัปเดตรายวัน"}/><Metric label="พอร์ตลงทุน value" value={totalValue?money(totalValue):"—"} sub={totalPnl?((totalPnl>=0?"+":"")+money(totalPnl)+" กำไร/ขาดทุน"):"ยังไม่มีหุ้นในพอร์ต"}/></div>
- <section className="section"><div className="decisionHead"><div><span className="eyebrow">INVESTMENT DECISION</span><h3>หุ้นที่น่าลงทุนจริงตอนนี้</h3><p>คัดจากสุขภาพธุรกิจ, Growth, ฐานะการเงิน, Valuation, ความเสี่ยง และ KPI ที่ปรับตามอุตสาหกรรม</p></div><button className="secondary" onClick={onRank}>ดูทั้งหมด →</button></div><div className="investmentPicks">{investmentPicks.map((s,i)=><InvestmentPick key={s.ticker} s={s} rank={i+1} onOpen={onOpen}/>)}</div></section><section className="section"><SectionHead title="โอกาสที่น่าสนใจ" action="ดูอันดับทั้งหมด →" onClick={onRank}/><div className="opps">{buys.map(s=><Opportunity key={s.ticker} s={s} onOpen={onOpen}/>)}</div></section>
+ <section className="section"><div className="decisionHead"><div><span className="eyebrow">INVESTMENT DECISION</span><h3>หุ้นที่น่าลงทุนจริงตอนนี้</h3><p>คัดจากสุขภาพธุรกิจ, Growth, ฐานะการเงิน, Valuation, ความเสี่ยง และ KPI ที่ปรับตามอุตสาหกรรม</p></div><button className="secondary" onClick={onRank}>ดูทั้งหมด →</button></div><div className="investmentPicks">{investmentPicks.map((s,i)=><InvestmentPick key={s.ticker} s={s} rank={i+1} insights={insights[s.ticker]} onOpen={onOpen}/>)}</div></section><section className="section"><SectionHead title="โอกาสที่น่าสนใจ" action="ดูอันดับทั้งหมด →" onClick={onRank}/><div className="opps">{buys.map(s=><Opportunity key={s.ticker} s={s} onOpen={onOpen}/>)}</div></section>
  <section className="section intelligence"><div className="intelHead"><div><span className="eyebrow">AI INVESTMENT BRIEF</span><h3>สิ่งที่สำคัญตอนนี้</h3></div><button className="primary" onClick={onBrief}>{briefLoading?"กำลังวิเคราะห์…":"สร้างสรุปด้วย AI"}</button></div>{brief?<div className="brief">{brief}</div>:<div className="empty compact">กด สร้างสรุปด้วย AI เพื่อให้ Gemini สรุปภาพรวมจากข้อมูลใน Dashboard โดยไม่เติมตัวเลขเอง</div>}</section>
  <section className="section"><SectionHead title="มีอะไรเปลี่ยนจากครั้งก่อน" action={changes.length?changes.length+" signals":"ยังไม่มีการเปลี่ยนแปลง"}/>{changes.length?<div className="changes">{changes.slice(0,6).map(x=><ChangeItem key={x.ticker} x={x} ai={changeAI[x.ticker]} loading={changeAILoading===x.ticker} onExplain={onExplainChange}/>)}</div>:<div className="empty compact">ยังไม่มี snapshot ก่อนหน้า ระบบจะเริ่มเก็บประวัติหลังการ sync ครั้งถัดไป</div>}</section>
  <section className="section"><SectionHead title="ข่าวตลาด" action={news.length?news.length+" ข่าว":""}/>{news.length?<div className="newsList">{news.map((n,i)=><ข่าวItem key={n.url||i} n={n}/>)}</div>:<div className="empty">ยังไม่มีข่าวจากแหล่งข้อมูลฟรีในขณะนี้</div>}</section>
@@ -135,7 +135,7 @@ function HomeView({stocks,buys,investmentPicks,portfolioRows,totalValue,totalPnl
 }
 function ChangeItem({x,ai,loading,onExplain}){const sc=Number(x.score_change||0),pc=Number(x.price_change_pct||0);return <div className="changeItem"><div><b>{x.ticker}</b><span>{x.reason}</span>{ai&&<p className="changeAI">{ai}</p>}<button className="changeExplain" onClick={()=>onExplain(x)}>{loading?"กำลังวิเคราะห์…":ai?"วิเคราะห์อีกครั้ง":"ทำไมคะแนนเปลี่ยน?"}</button></div><strong className={sc>=0?"up":"down"}>{x.score_change==null?"—":(sc>=0?"+":"")+fmt(sc,1)+" pts"}</strong><small className={pc>=0?"up":"down"}>{x.price_change_pct==null?"":(pc>=0?"+":"")+fmt(pc,1)+"%"}</small></div>}
 function Explain({n,t,d}){return <div className="explain"><strong>{n}</strong><b>{t}</b><span>{d}</span></div>}
-function InvestmentPick({s,rank,onOpen}){
+function InvestmentPick({s,rank,insights,onOpen}){
  const d=s.investmentDecision||investmentDecision(s);
  return <button className="investmentPick" onClick={()=>onOpen(s)}>
   <span className="pickRank">#{rank}</span>
@@ -153,7 +153,7 @@ function พอร์ตลงทุน({rows,totalValue,totalCost,totalPnl,onOp
 
 function ข่าวItem({n}){return <a className="newsItem" href={n.url||"#"} target="_blank" rel="noreferrer"><span className="newsTicker">{n.ticker}</span><div><b>{n.title}</b><small>{n.source||"ข่าว"} · {n.publishedAt?dateShort(n.publishedAt):""}</small></div></a>}
 
-function หุ้นDrawer({stock:s,onClose,onAI,ai,aiLoading,watch,setWatch,portfolio,setพอร์ตลงทุน}){
+function หุ้นDrawer({insights:insight,stock:s,onClose,onAI,ai,aiLoading,watch,setWatch,portfolio,setพอร์ตลงทุน}){
  const isWatch=watch.includes(s.ticker),[qty,setQty]=useState(portfolio[s.ticker]?.qty||""),[avg,setAvg]=useState(portfolio[s.ticker]?.avg||"");
  const price=Number(s.price||s.db_price||0),upside=s.fair_value_base&&price?((Number(s.fair_value_base)/price-1)*100):null;
  const pegReliable=!((s.industry||"").toLowerCase().includes("semiconductor")||((s.sector||"").toLowerCase().includes("consumer")&&Number(s.growth_current||0)>Number(s.growth_next||0)*1.8));
@@ -167,7 +167,7 @@ function หุ้นDrawer({stock:s,onClose,onAI,ai,aiLoading,watch,setWatch,po
  <GrowthValuationFit stock={s}/>
  <PriceScenario stock={s} price={price}/>
  <Block title="สถานะในพอร์ต"><div className="positionForm"><label>จำนวนหุ้น<input type="number" min="0" step="any" value={qty} onChange={e=>setQty(e.target.value)} placeholder="0"/></label><label>ต้นทุนเฉลี่ย<input type="number" min="0" step="any" value={avg} onChange={e=>setAvg(e.target.value)} placeholder="0.00"/></label><button className="primary" onClick={saveHolding}>บันทึกสถานะ</button></div></Block>
- <BusinessDecision stock={s}/><Block title="มูลค่า/ราคา"><Grid items={[["Forward P/E",s.forward_pe?fmt(s.forward_pe,1)+"x":"—"],["PEG",s.peg?fmt(s.peg,2):"—"],["Industry Fwd P/E",s.industry_forward_pe?fmt(s.industry_forward_pe,1)+"x":"—"],["Trailing P/E",s.trailing_pe?fmt(s.trailing_pe,1)+"x":"N/A"]]}/><div className="priceOutlook"><b>โอกาสราคาจากมูลค่ายุติธรรม</b><strong>{upside==null?"—":(upside>=0?"+":"")+fmt(upside,1)+"%"}</strong><small>คำนวณจากราคาปัจจุบันเทียบกับ Fair Value Base ไม่ใช่การรับประกันราคาหุ้น</small></div><AnalystTarget news={s.news||[]} price={price}/></Block>
+ <BusinessDecision stock={s}/><IntelligencePanel s={s} insight={insight}/><Block title="มูลค่า/ราคา"><Grid items={[["Forward P/E",s.forward_pe?fmt(s.forward_pe,1)+"x":"—"],["PEG",s.peg?fmt(s.peg,2):"—"],["Industry Fwd P/E",s.industry_forward_pe?fmt(s.industry_forward_pe,1)+"x":"—"],["Trailing P/E",s.trailing_pe?fmt(s.trailing_pe,1)+"x":"N/A"]]}/><div className="priceOutlook"><b>โอกาสราคาจากมูลค่ายุติธรรม</b><strong>{upside==null?"—":(upside>=0?"+":"")+fmt(upside,1)+"%"}</strong><small>คำนวณจากราคาปัจจุบันเทียบกับ Fair Value Base ไม่ใช่การรับประกันราคาหุ้น</small></div><AnalystTarget news={s.news||[]} price={price}/></Block>
  <Block title="โอกาสการเติบโต"><div className="growthHighlight"><strong>{pct(s.growth_next)}</strong><span>คาดการณ์การเติบโตของกำไรปีหน้า</span></div><Grid items={[["ปัจจุบัน",pct(s.growth_current)],["ปีหน้า",pct(s.growth_next)],["ระยะยาว",pct(s.growth_long)],["รายได้",pct(s.revenue_growth)]]}/></Block><Block title="ข่าวที่สนับสนุนการเติบโต"><PositiveNews news={s.news||[]}/></Block>
  <Block title="คุณภาพธุรกิจและความเสี่ยง"><Grid items={[["ROE",pct(s.roe)],["Profit margin",pct(s.profit_margin)],["กระแสเงินสดอิสระ",usd(s.free_cash_flow)],["หนี้สิน / ทุน",fmt(s.debt_to_equity,2)],["Beta",fmt(s.beta,2)]]}/></Block>
  <div className="newsPriceNote">ข่าวสามารถทำให้ราคาเปลี่ยนได้ โดยเฉพาะการปรับ Guidance, EPS/Revenue estimates หรือราคาเป้าหมายของนักวิเคราะห์ แต่ระบบจะแสดง % จากข่าวเฉพาะเมื่อมีตัวเลขอ้างอิงชัดเจนในข่าว</div><div className="reliability"><b>ความน่าเชื่อถือของ PEG</b><span>{pegReliable?"ใช้ประกอบการประเมินได้ แต่ควรดูความสม่ำเสมอของกำไรและวัฏจักรร่วมด้วย.":"ความเชื่อมั่นต่ำลง เพราะกำไรที่ผันผวนหรือเป็นวัฏจักรอาจทำให้ PEG คลาดเคลื่อน จึงไม่ควรพึ่ง PEG เพียงอย่างเดียว."}</span></div>
@@ -268,8 +268,40 @@ function Block({title,children}){return <section className="block"><h3>{title}</
 function Grid({items}){return <div className="dataGrid">{items.map(([a,b])=><div key={a}><span>{a}</span><b>{b}</b></div>)}</div>}
 
 
+
+function IntelligencePanel({s,insight}){
+ if(!insight) return <div className="empty compact">ยังไม่มีข้อมูลประวัติสำหรับวิเคราะห์เชิงลึก</div>;
+ const h=insight.historical||{}, r=insight.revision||{}, p=insight.peers||{};
+ const current=Number(s.forward_pe), peer=Number(p.avgForwardPE), growth=Number(s.growth_next), pg=Number(p.avgGrowth);
+ const relative=current>0&&peer>0?((current/peer)-1)*100:null;
+ const fit=current>0&&growth>0?current/growth:null;
+ const thesis=[];
+ if(growth>0) thesis.push("กำไรมีแนวโน้มเติบโต");
+ if(relative!=null&&relative<=10) thesis.push("Valuation ไม่ได้สูงกว่าค่าเฉลี่ยกลุ่มมาก");
+ if(r.trend==="ปรับประมาณการขึ้น") thesis.push("ประมาณการกำไรมีทิศทางดีขึ้น");
+ const risks=[];
+ if(r.trend==="ปรับประมาณการลง") risks.push("ประมาณการกำไรถูกปรับลง");
+ if(relative!=null&&relative>25) risks.push("P/E สูงกว่าค่าเฉลี่ยกลุ่มมาก");
+ if(insight.industryCycle==="ชะลอกว่ากลุ่ม") risks.push("Growth ชะลอกว่าค่าเฉลี่ยกลุ่ม");
+ return <section className="deepIntelligence">
+  <div className="decisionHead"><div><span className="eyebrow">DEEP INVESTMENT CHECK</span><h3>อดีต · คู่แข่ง · Revision · วัฏจักร</h3></div></div>
+  <div className="intelGrid">
+   <div><span>Forward P/E ปัจจุบัน</span><b>{current>0?fmt(current,1)+"x":"—"}</b><small>Median ในประวัติ {h.median?fmt(h.median,1)+"x":"ข้อมูลไม่พอ"}</small></div>
+   <div><span>ตำแหน่ง P/E ในอดีต</span><b>{h.percentile!=null?h.percentile+"th percentile":"—"}</b><small>{h.percentile!=null?(h.percentile>=80?"ค่อนข้างแพง":h.percentile<=30?"ค่อนข้างถูก":"อยู่ในกรอบกลาง"):"ต้องสะสมข้อมูลเพิ่ม"}</small></div>
+   <div><span>Revision ของ Growth</span><b>{r.trend}</b><small>{r.delta!=null?((r.delta>=0?"+":"")+fmt(r.delta,1)+" จุดจาก snapshot ล่าสุดที่มี"): "ข้อมูลยังไม่พอ"}</small></div>
+   <div><span>วัฏจักรอุตสาหกรรม</span><b>{insight.industryCycle}</b><small>{p.avgGrowth!=null?"Growth กลุ่มเฉลี่ย "+pct(p.avgGrowth):"ยังไม่มีค่าเฉลี่ยกลุ่ม"}</small></div>
+  </div>
+  <div className="peerCompare"><div><b>เทียบคู่แข่ง/กลุ่ม</b><span>กลุ่ม: {insight.industry}</span></div><div className="peerStats"><span>P/E หุ้น <b>{current>0?fmt(current,1)+"x":"—"}</b></span><span>P/E กลุ่ม <b>{peer>0?fmt(peer,1)+"x":"—"}</b></span><span>Growth หุ้น <b>{Number.isFinite(growth)?pct(growth):"—"}</b></span><span>Growth กลุ่ม <b>{pg!=null?pct(pg):"—"}</b></span></div>{relative!=null&&<small>{relative>=0?"+":""}{fmt(relative,1)}% เทียบ P/E เฉลี่ยของกลุ่ม</small>}</div>
+  <div className="thesisGrid"><div><b>เหตุผลที่น่าสนใจ</b><p>{thesis.length?thesis.join(" · "):"ยังไม่มีข้อมูลเพียงพอ"}</p></div><div><b>สิ่งที่อาจทำให้ Thesis ผิด</b><p>{risks.length?risks.join(" · "):"ยังไม่พบสัญญาณเตือนจากข้อมูลที่มี"}</p></div></div>
+  <div className="scenarioProbability"><b>Expected Value แบบสถานการณ์</b><div><span>Bear 25%</span><span>Base 50%</span><span>Bull 25%</span></div><small>ใช้ความน่าจะเป็น 25/50/25 เป็น “สมมติฐานของโมเดล” ไม่ใช่ความน่าจะเป็นจากตลาด และคำนวณจาก Fair Value Low/Base/High เมื่อมีข้อมูลครบ</small></div>
+ </section>
+}
+
 function AnalystTarget({news,price}){
  const x=extractAnalystTarget(news,price);
  if(!x) return <div className="targetCard mutedTarget"><b>ราคาเป้าหมายนักวิเคราะห์</b><strong>ยังไม่มีข้อมูล</strong><small>ระบบจะแสดงตัวเลขเมื่อข่าวมีราคาเป้าหมายที่ระบุชัดเจนเท่านั้น — ไม่คาดเดาตัวเลขเอง</small></div>;
  return <div className="targetCard"><div><b>ราคาเป้าหมายนักวิเคราะห์จากข่าว</b><small>{x.source}</small></div><strong>{usd(x.target)}</strong><span className={x.upside>=0?"up":"down"}>{x.upside==null?"—":(x.upside>=0?"+":"")+fmt(x.upside,1)+"% จากราคาปัจจุบัน"}</span><a href={x.url||"#"} target="_blank" rel="noreferrer">ดูข่าวอ้างอิง →</a></div>
 }
+<style jsx>{`
+.deepIntelligence{margin:14px 0;padding:14px;border:1px solid #263850;border-radius:12px;background:#0b1420}.intelGrid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:10px}.intelGrid>div,.peerCompare,.thesisGrid>div,.scenarioProbability{padding:10px;border:1px solid #20324b;background:#0a131f;border-radius:9px}.intelGrid span,.intelGrid small,.peerCompare span,.scenarioProbability small{display:block;color:#91a1b7;font-size:10px}.intelGrid b{display:block;margin-top:3px;font-size:14px}.peerCompare{margin-top:8px}.peerStats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:8px}.peerStats span{color:#aebbd0}.peerStats b{color:#fff}.thesisGrid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}.thesisGrid p{margin:5px 0 0;color:#c9d3e2;font-size:12px;line-height:1.5}.scenarioProbability{margin-top:8px}.scenarioProbability>div{display:flex;gap:8px;margin:8px 0}.scenarioProbability span{flex:1;text-align:center;padding:7px;background:#111e2d;border-radius:7px;font-size:11px}@media(max-width:700px){.intelGrid,.peerStats,.thesisGrid{grid-template-columns:1fr 1fr}.intelGrid>div:first-child{grid-column:1/-1}}
+`}</style>
