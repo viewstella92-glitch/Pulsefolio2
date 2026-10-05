@@ -2,9 +2,7 @@
   "name": "personal-stock-tracker",
   "version": "1.0.0",
   "private": true,
-  "engines": {
-    "node": "22.x"
-  },
+  "engines": { "node": "22.x" },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -13,8 +11,6 @@
   "dependencies": {
     "next": "15.5.7",
     "react": "19.1.2",
-    "react-dom": "19.1.2",
-    "lucide-react": "0.468.0",
-    "@supabase/supabase-js": "2.58.0"
+    "react-dom": "19.1.2"
   }
 }
