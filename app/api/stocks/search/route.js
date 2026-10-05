@@ -24,21 +24,13 @@ export async function POST(req){
   const ticker=String(body?.ticker||"").trim().toUpperCase();
   if(!/^[A-Z.\-]{1,10}$/.test(ticker))return NextResponse.json({error:"Invalid ticker"},{status:400});
   const url=process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key=process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if(!url||!key)return NextResponse.json({error:"Server database configuration is missing"},{status:500});
+  if(!url)return NextResponse.json({error:"Supabase environment variables are missing"},{status:500});
   try{
     const results=await yahooSearch(ticker);
     const found=results.find(x=>x.ticker===ticker);
     if(!found)return NextResponse.json({error:"ไม่พบหุ้นนี้ใน Yahoo Finance"},{status:404});
-    const h={apikey:key,Authorization:"Bearer "+key,"Content-Type":"application/json","Prefer":"resolution=merge-duplicates,return=minimal"};
-    const u=url+"/rest/v1/stock_universe";
-    const ins=await fetch(u,{method:"POST",headers:h,body:JSON.stringify({ticker:found.ticker,name:found.name,sector:found.sector,industry:found.industry,active:true})});
-    if(!ins.ok){
-      const t=await ins.text();
-      if(!/duplicate|already exists|unique/i.test(t))throw new Error(t||"Could not add stock");
-    }
-    const sr=await fetch(new URL("/api/stocks/search",req.url),{method:"GET"});
-    await fetch("https://ailjqgahjjnlhlabooip.supabase.co/functions/v1/pulse-sync",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({tickers:[ticker]})});
+    const sync=await fetch("https://ailjqgahjjnlhlabooip.supabase.co/functions/v1/pulse-sync",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({tickers:[ticker]})});
+    if(!sync.ok)throw new Error((await sync.text())||"Stock sync failed");
     await fetch("https://ailjqgahjjnlhlabooip.supabase.co/functions/v1/estimate-sync",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({tickers:[ticker]})});
     return NextResponse.json({ok:true,stock:found});
   }catch(e){return NextResponse.json({error:e?.message||"Add stock failed"},{status:500});}
