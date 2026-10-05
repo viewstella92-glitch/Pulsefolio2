@@ -100,3 +100,16 @@ body{line-height:1.65}
 .outlookGrid>div{padding:11px;border:1px solid #20324b;background:#0a131f;border-radius:9px}
 .outlookGrid span{display:block;font-size:11px;color:#91a1b7}.outlookGrid b{display:block;font-size:18px;margin:2px 0}.outlookGrid small{font-size:10px;color:#718198}
 @media(max-width:700px){.scoreCards{grid-template-columns:repeat(2,1fr)}.outlookGrid{grid-template-columns:1fr}.investmentSnapshot{padding:13px}.snapshotHead h3{font-size:15px}}
+
+.priceScenario{margin:18px 0 4px;padding:16px;border:1px solid #263b59;background:linear-gradient(145deg,#0d1828,#09121e);border-radius:12px}
+.scenarioHead{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px}
+.scenarioHead h3{margin:2px 0 0;font-size:16px}.scenarioHead small{color:#718198;font-size:10px}
+.scenarioGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.scenarioCard{padding:12px;border:1px solid #20324b;background:#0a131f;border-radius:9px}
+.scenarioCard.down{border-color:#49303a}.scenarioCard.base{border-color:#344667}.scenarioCard.up{border-color:#284b3d}
+.scenarioTop{display:flex;align-items:baseline;gap:7px}.scenarioTop b{font-size:14px}.scenarioTop span{font-size:10px;color:#8291a7}
+.scenarioCard>strong{display:block;font-size:22px;margin:7px 0 1px}.scenarioCard>span{display:block;font-size:14px;font-weight:700}.scenarioCard>small{display:block;margin-top:6px;color:#718198;font-size:10px}
+.scenarioMissing{color:#78879d!important;font-weight:500!important}
+.scenarioNote{margin-top:9px;padding:9px 11px;border:1px dashed #30415c;color:#8291a7;border-radius:8px;font-size:11px;line-height:1.6}
+.scenarioNote b{color:#c6d0df}
+@media(max-width:700px){.priceScenario{padding:13px}.scenarioGrid{grid-template-columns:1fr}.scenarioHead{align-items:flex-start;flex-direction:column;gap:3px}.scenarioHead h3{font-size:15px}}
