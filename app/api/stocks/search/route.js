@@ -31,7 +31,10 @@ export async function POST(req){
     if(!found)return NextResponse.json({error:"ไม่พบหุ้นนี้ใน Yahoo Finance"},{status:404});
     const sync=await fetch("https://ailjqgahjjnlhlabooip.supabase.co/functions/v1/pulse-sync",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({tickers:[ticker]})});
     const syncText=await sync.text();
-    const est=await fetch("https://ailjqgahjjnlhlabooip.supabase.co/functions/v1/estimate-sync",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({tickers:[ticker]})});
-    return NextResponse.json({ok:true,stock:found,syncOk:sync.ok,syncResult:syncText,estimateOk:est.ok});
+    const syncResult=syncText ? JSON.parse(syncText) : null;
+    if(!sync.ok || syncResult?.failed>0){
+      return NextResponse.json({ok:false,error:syncResult?.errors?.[0]?.error||"ไม่สามารถอัปเดตข้อมูลหุ้นได้",stock:found,syncOk:sync.ok,syncResult},{status:502});
+    }
+    return NextResponse.json({ok:true,stock:found,syncOk:true,syncResult});
   }catch(e){return NextResponse.json({error:e?.message||"Add stock failed"},{status:500});}
 }
