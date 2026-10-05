@@ -275,6 +275,9 @@ function IntelligencePanel({s,insight}){
  if(!insight) return <div className="empty compact">ยังไม่มีข้อมูลประวัติสำหรับวิเคราะห์เชิงลึก</div>;
  const h=insight.historical||{}, r=insight.revision||{}, p=insight.peers||{};
  const current=Number(s.forward_pe), peer=Number(p.avgForwardPE), growth=Number(s.growth_next), pg=Number(p.avgGrowth);
+ const low=Number(s.fair_value_low),base=Number(s.fair_value_base),high=Number(s.fair_value_high),price=Number(s.price);
+ const expected=low>0&&base>0&&high>0?(low*.25+base*.5+high*.25):null;
+ const expectedUpside=expected&&price>0?((expected/price)-1)*100:null;
  const relative=current>0&&peer>0?((current/peer)-1)*100:null;
  const fit=current>0&&growth>0?current/growth:null;
  const thesis=[];
@@ -295,7 +298,7 @@ function IntelligencePanel({s,insight}){
   </div>
   <div className="peerCompare"><div><b>เทียบคู่แข่ง/กลุ่ม</b><span>กลุ่ม: {insight.industry}</span></div><div className="peerStats"><span>P/E หุ้น <b>{current>0?fmt(current,1)+"x":"—"}</b></span><span>P/E กลุ่ม <b>{peer>0?fmt(peer,1)+"x":"—"}</b></span><span>Growth หุ้น <b>{Number.isFinite(growth)?pct(growth):"—"}</b></span><span>Growth กลุ่ม <b>{pg!=null?pct(pg):"—"}</b></span></div>{relative!=null&&<small>{relative>=0?"+":""}{fmt(relative,1)}% เทียบ P/E เฉลี่ยของกลุ่ม</small>}</div>
   <div className="thesisGrid"><div><b>เหตุผลที่น่าสนใจ</b><p>{thesis.length?thesis.join(" · "):"ยังไม่มีข้อมูลเพียงพอ"}</p></div><div><b>สิ่งที่อาจทำให้ Thesis ผิด</b><p>{risks.length?risks.join(" · "):"ยังไม่พบสัญญาณเตือนจากข้อมูลที่มี"}</p></div></div>
-  <div className="scenarioProbability"><b>Expected Value แบบสถานการณ์</b><div><span>Bear 25%</span><span>Base 50%</span><span>Bull 25%</span></div><small>ใช้ความน่าจะเป็น 25/50/25 เป็น “สมมติฐานของโมเดล” ไม่ใช่ความน่าจะเป็นจากตลาด และคำนวณจาก Fair Value Low/Base/High เมื่อมีข้อมูลครบ</small></div>
+  <div className="scenarioProbability"><b>Expected Value แบบสถานการณ์</b>{expected!=null?<><strong>{usd(expected)}</strong><span className={expectedUpside>=0?"up":"down"}>{expectedUpside>=0?"+":""}{fmt(expectedUpside,1)}% จากราคาปัจจุบัน</span></>:<span>ยังไม่มี Fair Value ครบ 3 ระดับ</span>}<div><span>Bear 25%</span><span>Base 50%</span><span>Bull 25%</span></div><small>ใช้ความน่าจะเป็น 25/50/25 เป็น “สมมติฐานของโมเดล” ไม่ใช่ความน่าจะเป็นจากตลาด และคำนวณจาก Fair Value Low/Base/High เมื่อมีข้อมูลครบ</small></div>
  </section>
 }
 
