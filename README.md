@@ -25,3 +25,5 @@ Upload this project to GitHub, import the repository in Vercel, and deploy. No e
 
 ## Notes
 Market data can be delayed, unavailable, or rate-limited. This project is for tracking/education and is not financial advice.
+
+<!-- production deploy trigger -->
