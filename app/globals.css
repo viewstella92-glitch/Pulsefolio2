@@ -113,3 +113,12 @@ body{line-height:1.65}
 .scenarioNote{margin-top:9px;padding:9px 11px;border:1px dashed #30415c;color:#8291a7;border-radius:8px;font-size:11px;line-height:1.6}
 .scenarioNote b{color:#c6d0df}
 @media(max-width:700px){.priceScenario{padding:13px}.scenarioGrid{grid-template-columns:1fr}.scenarioHead{align-items:flex-start;flex-direction:column;gap:3px}.scenarioHead h3{font-size:15px}}
+
+.growthFit{margin:18px 0 4px;padding:16px;border:1px solid #263b59;background:linear-gradient(145deg,#0d1828,#09121e);border-radius:12px}
+.growthFit.positive{border-color:#294b3e}.growthFit.negative{border-color:#4d3039}
+.growthFitHead{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px}.growthFitHead h3{margin:2px 0 0;font-size:16px}
+.fitBadge{font-size:11px;font-weight:700;padding:5px 9px;border-radius:999px;border:1px solid #334765;color:#f1c77a;background:#292116}
+.growthFit.positive .fitBadge{color:#86e3b0;background:#10261f;border-color:#315744}.growthFit.negative .fitBadge{color:#ff9aa5;background:#2b171d;border-color:#5a3039}
+.fitGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.fitGrid>div{padding:11px;border:1px solid #20324b;background:#0a131f;border-radius:9px}.fitGrid span{display:block;color:#91a1b7;font-size:11px}.fitGrid b{display:block;font-size:20px;margin-top:3px}
+.growthFit p{margin:10px 0 5px;color:#c6d0df;font-size:12px;line-height:1.7}.growthFit p b{color:#fff}.growthFit>small{display:block;color:#718198;font-size:10px;line-height:1.6}
+@media(max-width:700px){.growthFit{padding:13px}.growthFitHead{align-items:flex-start;flex-direction:column;gap:5px}.growthFitHead h3{font-size:15px}.fitGrid{grid-template-columns:1fr 1fr}.growthFit p{font-size:11px}}
