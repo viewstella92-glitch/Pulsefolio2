@@ -87,3 +87,16 @@ body{line-height:1.65}
 .targetCard{margin-top:10px;padding:13px 14px;border:1px solid #304465;background:linear-gradient(145deg,#101c2d,#0b1420);border-radius:10px;display:grid;grid-template-columns:1fr auto;gap:4px 12px;align-items:center}
 .targetCard b{font-size:13px}.targetCard div small{display:block;color:#8090a7;font-size:11px;margin-top:2px}.targetCard>strong{font-size:23px}.targetCard>span{font-size:12px}.targetCard a{grid-column:1/-1;color:#9aa6ff;text-decoration:none;font-size:11px;margin-top:3px}.mutedTarget{border-color:#24344d;background:#0b131f}.mutedTarget strong{font-size:14px;color:#8796ac}.mutedTarget small{grid-column:1/-1;color:#74839a;font-size:11px;line-height:1.6}
 @media(max-width:700px){body{font-size:14px}.header h1{font-size:27px}.hero{padding:25px}.hero h2{font-size:27px}.hero p{font-size:14px}.section{padding:18px}.sectionHead h3{font-size:17px}.metric strong{font-size:23px}.brief{font-size:13px}.drawer{padding:24px 18px}.drawerTop h2{font-size:34px}.priceLine strong{font-size:30px}.targetCard>strong{font-size:20px}}
+
+.investmentSnapshot{margin:18px 0 4px;padding:16px;border:1px solid #263b59;background:linear-gradient(145deg,#0d1828,#09121e);border-radius:12px}
+.snapshotHead{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:13px}
+.snapshotHead h3{margin:2px 0 0;font-size:16px}
+.snapshotSignal{font-size:11px;font-weight:700;padding:5px 9px;border-radius:999px;border:1px solid #334765}
+.snapshotSignal.positive{color:#86e3b0;background:#10261f}.snapshotSignal.neutral{color:#f1c77a;background:#292116}
+.scoreCards{display:grid;grid-template-columns:repeat(4,1fr);gap:7px}
+.scoreCard{padding:10px;border:1px solid #20324b;background:#0a131f;border-radius:9px}
+.scoreCard span{display:block;font-size:11px;color:#91a1b7}.scoreCard strong{font-size:20px;line-height:1.2}.scoreCard small{font-size:9px;color:#697a91;margin-left:3px}
+.outlookGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-top:8px}
+.outlookGrid>div{padding:11px;border:1px solid #20324b;background:#0a131f;border-radius:9px}
+.outlookGrid span{display:block;font-size:11px;color:#91a1b7}.outlookGrid b{display:block;font-size:18px;margin:2px 0}.outlookGrid small{font-size:10px;color:#718198}
+@media(max-width:700px){.scoreCards{grid-template-columns:repeat(2,1fr)}.outlookGrid{grid-template-columns:1fr}.investmentSnapshot{padding:13px}.snapshotHead h3{font-size:15px}}
