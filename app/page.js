@@ -201,25 +201,43 @@ function InvestmentSnapshot({stock:s,price,upside}){
 }
 
 function GrowthValuationFit({stock:s}){
- const pe=Number(s.forward_pe), growth=Number(s.growth_next);
- const valid=Number.isFinite(pe)&&pe>0&&Number.isFinite(growth)&&growth>0;
+ const price=num(s.price), pe=num(s.forward_pe), growth=num(s.growth_next), longGrowth=num(s.growth_long), industryPe=num(s.industry_forward_pe);
+ const valid=price>0&&pe>0&&growth>0;
+ const forwardEps=valid?price/pe:null;
  const peg=valid?pe/growth:null;
- let status="ยังประเมินไม่ได้", tone="neutral", reason="ต้องมี Forward P/E และคาดการณ์การเติบโตของกำไรปีหน้า";
+ const industryAnchor=industryPe>0?industryPe:pe;
+ const growthSupportedPe=valid?growth:null;
+ const targetPeBase=valid?((industryAnchor*0.6)+(growthSupportedPe*0.4)):null;
+ const targetPeBear=valid?((industryAnchor*0.75)+(growth*0.25)):null;
+ const targetPeBull=valid?((industryAnchor*0.45)+(growth*0.55)):null;
+ const g3=longGrowth!=null&&longGrowth>0?longGrowth:growth;
+ const eps3=forwardEps&&g3!=null?forwardEps*Math.pow(1+g3/100,2):null;
+ const priceBear=eps3&&targetPeBear?eps3*targetPeBear:null;
+ const priceBase=eps3&&targetPeBase?eps3*targetPeBase:null;
+ const priceBull=eps3&&targetPeBull?eps3*targetPeBull:null;
+ const baseUpside=priceBase&&price?((priceBase/price)-1)*100:null;
+ let status="ยังประเมินไม่ได้",tone="neutral",reason="ต้องมีราคาปัจจุบัน, Forward P/E และ Growth เพื่อสร้างกรอบราคา";
  if(valid){
-   if(peg<=1){status="P/E สอดคล้องกับการเติบโต";tone="positive";reason="ตลาดจ่าย P/E ไม่เกินอัตราการเติบโตของกำไรโดยประมาณ";}
-   else if(peg<=1.5){status="P/E ค่อนข้างสอดคล้อง";tone="positive";reason="P/E สูงกว่าการเติบโต แต่ยังอยู่ในช่วงที่พอรับได้เมื่อเทียบกับการเติบโต";}
-   else if(peg<=2){status="P/E เริ่มแพงเมื่อเทียบกับการเติบโต";tone="neutral";reason="ราคาหุ้นสะท้อนการเติบโตไปพอสมควรแล้ว";}
-   else{status="P/E แพงเมื่อเทียบกับการเติบโต";tone="negative";reason="P/E สูงกว่าการเติบโตมาก จึงต้องการการเติบโตที่แรงขึ้นเพื่อรองรับราคา";}
+   if(peg<=1){status="P/E สอดคล้องกับการเติบโต";tone="positive";reason="Valuation ปัจจุบันไม่สูงเมื่อเทียบกับ Growth";}
+   else if(peg<=1.5){status="P/E ค่อนข้างสอดคล้อง";tone="positive";reason="Valuation สูงกว่า Growth บางส่วน แต่ยังอยู่ในกรอบที่รับได้";}
+   else if(peg<=2){status="P/E เริ่มตึง";tone="neutral";reason="ราคาหุ้นสะท้อน Growth ไปพอสมควรแล้ว";}
+   else{status="P/E แพงเมื่อเทียบกับการเติบโต";tone="negative";reason="ราคาต้องการ Growth ที่สูงเพื่อรองรับ Valuation";}
  }
+ const upsideText=(v)=>v==null||!price?"ต้องมีข้อมูล":(v/price-1>=0?"+":"")+fmt(v/price*100-100,1)+"%";
  return <section className={"growthFit "+tone}>
-  <div className="growthFitHead"><div><span className="eyebrow">GROWTH × VALUATION</span><h3>การเติบโตสอดคล้องกับ P/E หรือไม่?</h3></div><span className="fitBadge">{status}</span></div>
+  <div className="growthFitHead"><div><span className="eyebrow">GROWTH × VALUATION</span><h3>การเติบโตสอดคล้องกับ P/E และราคาหุ้นหรือไม่?</h3></div><span className="fitBadge">{status}</span></div>
   <div className="fitGrid">
    <div><span>Forward P/E</span><b>{valid?fmt(pe,1)+"x":"—"}</b></div>
    <div><span>กำไรปีหน้าโต</span><b>{valid?pct(growth):"—"}</b></div>
    <div><span>PEG โดยประมาณ</span><b>{valid?fmt(peg,2):"—"}</b></div>
   </div>
-  <p><b>วิเคราะห์:</b> {reason}</p>
-  <small>หลักคิด: PEG = Forward P/E ÷ อัตราการเติบโตของกำไร (%). ใช้เป็นตัวช่วยดูว่า valuation สอดคล้องกับ growth หรือไม่ ไม่ควรใช้ตัวเดียวตัดสินใจ โดยเฉพาะหุ้นวัฏจักรหรือกำไรผันผวน</small>
+  <div className="priceEstimateGrid">
+   <div><span>ราคาประเมินกรณีลบ</span><b>{priceBear?usd(priceBear):"—"}</b><small>{upsideText(priceBear)}</small></div>
+   <div><span>ราคาประเมินกรณีฐาน</span><b>{priceBase?usd(priceBase):"—"}</b><small>{upsideText(priceBase)}</small></div>
+   <div><span>ราคาประเมินกรณีบวก</span><b>{priceBull?usd(priceBull):"—"}</b><small>{upsideText(priceBull)}</small></div>
+  </div>
+  <p><b>วิเคราะห์:</b> {reason} {priceBase&&price?"กรณีฐานให้ Upside ประมาณ "+(baseUpside>=0?"+":"")+fmt(baseUpside,1)+"%":""}</p>
+  <small>วิธีคำนวณ: ใช้ Forward EPS โดยประมาณ (ราคาปัจจุบัน ÷ Forward P/E) แล้วเติบโตต่อ 2 ปีด้วย Growth ระยะยาว/ปีหน้า จากนั้นคูณด้วย Target P/E ที่ถ่วงระหว่าง Industry Forward P/E กับ P/E ที่รองรับ Growth. เป็นกรอบประเมินจากสมมติฐาน ไม่ใช่ราคาเป้าหมายจากนักวิเคราะห์ และไม่ใช่การรับประกันราคา</small>
  </section>
 }
 
