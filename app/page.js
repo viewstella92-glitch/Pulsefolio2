@@ -103,6 +103,7 @@ function หุ้นDrawer({stock:s,onClose,onAI,ai,aiLoading,watch,setWatch,po
  <div className="actions2"><button className="primary" onClick={()=>setWatch(w=>isWatch?w.filter(x=>x!==s.ticker):[...w,s.ticker])}>{isWatch?"✓ ✓ อยู่ในรายการติดตาม":"+ + เพิ่มในรายการติดตาม"}</button><button className="secondary" onClick={onAI}>{aiLoading?"กำลังวิเคราะห์…":"ให้ Gemini วิเคราะห์"}</button></div>
  <div className="zone"><span className={"badge "+badgeClass(s.buy_zone)}>{s.buy_zone}</span><div><small>ช่วงมูลค่ายุติธรรม</small><b>{usd(s.fair_value_low)} / {usd(s.fair_value_base)} / {usd(s.fair_value_high)}</b></div></div>
  <InvestmentSnapshot stock={s} price={price} upside={upside}/>
+ <GrowthValuationFit stock={s}/>
  <PriceScenario stock={s} price={price}/>
  <Block title="สถานะในพอร์ต"><div className="positionForm"><label>จำนวนหุ้น<input type="number" min="0" step="any" value={qty} onChange={e=>setQty(e.target.value)} placeholder="0"/></label><label>ต้นทุนเฉลี่ย<input type="number" min="0" step="any" value={avg} onChange={e=>setAvg(e.target.value)} placeholder="0.00"/></label><button className="primary" onClick={saveHolding}>บันทึกสถานะ</button></div></Block>
  <Block title="มูลค่า/ราคา"><Grid items={[["Forward P/E",s.forward_pe?fmt(s.forward_pe,1)+"x":"—"],["PEG",s.peg?fmt(s.peg,2):"—"],["Industry Fwd P/E",s.industry_forward_pe?fmt(s.industry_forward_pe,1)+"x":"—"],["Trailing P/E",s.trailing_pe?fmt(s.trailing_pe,1)+"x":"N/A"]]}/><div className="priceOutlook"><b>โอกาสราคาจากมูลค่ายุติธรรม</b><strong>{upside==null?"—":(upside>=0?"+":"")+fmt(upside,1)+"%"}</strong><small>คำนวณจากราคาปัจจุบันเทียบกับ Fair Value Base ไม่ใช่การรับประกันราคาหุ้น</small></div><AnalystTarget news={s.news||[]} price={price}/></Block>
@@ -125,6 +126,29 @@ function InvestmentSnapshot({stock:s,price,upside}){
    <div><span>Fair Value Upside</span><b className={upside>=0?"up":"down"}>{upside==null?"—":(upside>=0?"+":"")+fmt(upside,1)+"%"}</b><small>เทียบมูลค่ายุติธรรม</small></div>
    <div><span>Analyst Target</span><b>{target?usd(target.target):"—"}</b><small>{target&&target.upside!=null?(target.upside>=0?"+":"")+fmt(target.upside,1)+"% จากราคาปัจจุบัน":"ยังไม่มีตัวเลขอ้างอิง"}</small></div>
   </div>
+ </section>
+}
+
+function GrowthValuationFit({stock:s}){
+ const pe=Number(s.forward_pe), growth=Number(s.growth_next);
+ const valid=Number.isFinite(pe)&&pe>0&&Number.isFinite(growth)&&growth>0;
+ const peg=valid?pe/growth:null;
+ let status="ยังประเมินไม่ได้", tone="neutral", reason="ต้องมี Forward P/E และคาดการณ์การเติบโตของกำไรปีหน้า";
+ if(valid){
+   if(peg<=1){status="P/E สอดคล้องกับการเติบโต";tone="positive";reason="ตลาดจ่าย P/E ไม่เกินอัตราการเติบโตของกำไรโดยประมาณ";}
+   else if(peg<=1.5){status="P/E ค่อนข้างสอดคล้อง";tone="positive";reason="P/E สูงกว่าการเติบโต แต่ยังอยู่ในช่วงที่พอรับได้เมื่อเทียบกับการเติบโต";}
+   else if(peg<=2){status="P/E เริ่มแพงเมื่อเทียบกับการเติบโต";tone="neutral";reason="ราคาหุ้นสะท้อนการเติบโตไปพอสมควรแล้ว";}
+   else{status="P/E แพงเมื่อเทียบกับการเติบโต";tone="negative";reason="P/E สูงกว่าการเติบโตมาก จึงต้องการการเติบโตที่แรงขึ้นเพื่อรองรับราคา";}
+ }
+ return <section className={"growthFit "+tone}>
+  <div className="growthFitHead"><div><span className="eyebrow">GROWTH × VALUATION</span><h3>การเติบโตสอดคล้องกับ P/E หรือไม่?</h3></div><span className="fitBadge">{status}</span></div>
+  <div className="fitGrid">
+   <div><span>Forward P/E</span><b>{valid?fmt(pe,1)+"x":"—"}</b></div>
+   <div><span>กำไรปีหน้าโต</span><b>{valid?pct(growth):"—"}</b></div>
+   <div><span>PEG โดยประมาณ</span><b>{valid?fmt(peg,2):"—"}</b></div>
+  </div>
+  <p><b>วิเคราะห์:</b> {reason}</p>
+  <small>หลักคิด: PEG = Forward P/E ÷ อัตราการเติบโตของกำไร (%). ใช้เป็นตัวช่วยดูว่า valuation สอดคล้องกับ growth หรือไม่ ไม่ควรใช้ตัวเดียวตัดสินใจ โดยเฉพาะหุ้นวัฏจักรหรือกำไรผันผวน</small>
  </section>
 }
 
