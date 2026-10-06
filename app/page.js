@@ -27,24 +27,27 @@ function metricScore(v,good,bad){
 }
 function investmentDecision(s){
   const profile=industryProfile(s);
-  const growth=num(s.growth_next), revenue=num(s.revenue_growth), margin=num(s.profit_margin), roe=num(s.roe), fcf=num(s.free_cash_flow), debt=num(s.debt_to_equity), pe=num(s.forward_pe), indPe=num(s.industry_forward_pe), peg=num(s.peg);
+  const growth=num(s.growth_next), revenue=num(s.revenue_growth), margin=num(s.profit_margin), roe=num(s.roe), fcf=num(s.free_cash_flow), debt=num(s.debt_to_equity), pe=num(s.forward_pe), peg=num(s.peg), beta=num(s.beta), newsScore=num(s.news_score)??50;
+  const core=[growth,revenue,margin,roe,fcf,debt,pe,peg].filter(v=>v!=null).length;
+  const coverage=core/8;
+  if(core<3) return {score:null,label:"ข้อมูลไม่ครบ",industry:profile.name,business:null,financial:null,valuation:null,risk:null,deterioration:null,warnings:["ข้อมูลพื้นฐานสำคัญยังไม่ครบ จึงยังไม่ควรจัดอันดับ"],positives:[],confidence:"ต่ำ",coverage};
   const growthScore=growth==null?50:clamp(50+growth*1.5);
+  const revenueScore=revenue==null?50:clamp(50+revenue*1.5);
   const marginScore=margin==null?50:clamp(50+margin*2.2);
   const roeScore=roe==null?50:clamp(50+roe*1.5);
-  const fcfScore=fcf==null?50:(fcf>0?70:25);
-  const debtScore=debt==null?50:clamp(90-debt*8);
+  const fcfScore=fcf==null?50:(fcf>0?72:25);
+  const debtScore=debt==null?50:clamp(90-debt*0.35);
   let valuationScore=50;
-  if(pe!=null&&pe>0&&growth!=null&&growth>0){const p=pe/growth;valuationScore=p<=1?92:p<=1.5?80:p<=2?62:p<=3?42:25;}
-  if(indPe!=null&&indPe>0&&pe!=null&&pe>0) valuationScore=clamp(valuationScore+(pe<indPe?8:-8));
-  const business=clamp(profile.keys.reduce((a,k)=>{
-    const m=k==="growth"?growthScore:k==="revenue"?(revenue==null?50:clamp(50+revenue*1.5)):k==="margin"?marginScore:k==="roe"?roeScore:k==="fcf"?fcfScore:valuationScore;
-    return a+m;
-  },0)/profile.keys.length);
+  if(pe!=null&&pe>0&&growth!=null&&growth>0){const p=pe/growth;valuationScore=p<=1?92:p<=1.5?82:p<=2?68:p<=3?48:28;}
+  else if(peg!=null&&peg>0){valuationScore=peg<1?78:peg<1.5?70:peg<2?60:peg<3?45:28;}
+  if(pe!=null&&pe>0&&num(s.industry_forward_pe)>0) valuationScore=clamp(valuationScore+(pe<num(s.industry_forward_pe)?7:-7));
+  const business=clamp((growthScore+revenueScore+marginScore)/3);
   const financial=clamp((marginScore+roeScore+fcfScore+debtScore)/4);
-  const riskPenalty=(growth!=null&&growth<0?22:0)+(revenue!=null&&revenue<0?18:0)+(margin!=null&&margin<0?20:0)+(fcf!=null&&fcf<0?18:0)+(debt!=null&&debt>150?12:0);
-  const risk=clamp(100-riskPenalty-(num(s.beta)!=null&&num(s.beta)>1.8?8:0));
+  const riskPenalty=(growth!=null&&growth<0?22:0)+(revenue!=null&&revenue<0?18:0)+(margin!=null&&margin<0?20:0)+(fcf!=null&&fcf<0?18:0)+(debt!=null&&debt>150?12:0)+(beta!=null&&beta>1.8?8:0);
+  const risk=clamp(100-riskPenalty);
+  const raw=valuationScore*.35+growthScore*.30+financial*.20+risk*.10+newsScore*.05;
+  const score=clamp(raw*(0.65+0.35*coverage));
   const deterioration=clamp(100-riskPenalty-(growth!=null&&growth<5?12:0));
-  const score=clamp(business*.30+growthScore*.20+financial*.15+valuationScore*.25+risk*.10);
   let label=score>=80?"น่าลงทุนมาก":score>=68?"น่าลงทุน":score>=55?"รอจังหวะ":score>=42?"ความเสี่ยงสูง":"ควรหลีกเลี่ยง";
   if(deterioration<45) label="ควรหลีกเลี่ยง";
   const warnings=[];
@@ -54,12 +57,13 @@ function investmentDecision(s){
   if(fcf!=null&&fcf<0) warnings.push("Free Cash Flow ติดลบ");
   if(debt!=null&&debt>150) warnings.push("หนี้สูง");
   if(peg!=null&&peg>2) warnings.push("P/E สูงเมื่อเทียบกับ Growth");
+  if(pe==null) warnings.push("ยังไม่มี Forward P/E ที่ยืนยันได้");
   const positives=[];
   if(growth!=null&&growth>=15) positives.push("Growth แข็งแรง");
   if(fcf!=null&&fcf>0) positives.push("สร้าง Free Cash Flow");
   if(roe!=null&&roe>=15) positives.push("ROE ดี");
   if(pe!=null&&growth!=null&&growth>0&&pe/growth<=1.5) positives.push("Valuation รองรับ Growth");
-  return {score, label, industry:profile.name, business, financial, valuation:valuationScore, risk, deterioration, warnings, positives};
+  return {score,label,industry:profile.name,business,financial,valuation:valuationScore,risk,deterioration,warnings,positives,confidence:coverage>=.75?"สูง":coverage>=.5?"กลาง":"ต่ำ",coverage};
 }
 const extractAnalystTarget=(items,price)=>{
   for(const n of (items||[])){
