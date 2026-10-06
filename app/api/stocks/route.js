@@ -1,3 +1,35 @@
+import yahooFinance from "yahoo-finance2";
+
+const yahooCache=new Map();
+const YAHOO_CACHE_MS=10*60*1000;
+async function yahooEnrich(stocks){
+  const now=Date.now();
+  return await Promise.all(stocks.map(async s=>{
+    const cached=yahooCache.get(s.ticker);
+    if(cached&&now-cached.at<YAHOO_CACHE_MS)return {...s,...cached.data};
+    try{
+      const q=await yahooFinance.quote(s.ticker);
+      const d={
+        price:q?.regularMarketPrice??s.price,
+        trailing_pe:q?.trailingPE??s.trailing_pe,
+        forward_pe:q?.forwardPE??s.forward_pe,
+        peg:q?.pegRatio??s.peg,
+        beta:q?.beta??s.beta,
+        growth_current:q?.earningsGrowth!=null?(Math.abs(q.earningsGrowth)<=2?q.earningsGrowth*100:q.earningsGrowth):s.growth_current,
+        revenue_growth:q?.revenueGrowth!=null?(Math.abs(q.revenueGrowth)<=2?q.revenueGrowth*100:q.revenueGrowth):s.revenue_growth,
+        roe:q?.returnOnEquity!=null?(Math.abs(q.returnOnEquity)<=2?q.returnOnEquity*100:q.returnOnEquity):s.roe,
+        profit_margin:q?.profitMargins!=null?(Math.abs(q.profitMargins)<=2?q.profitMargins*100:q.profitMargins):s.profit_margin,
+        free_cash_flow:q?.freeCashflow??s.free_cash_flow,
+        debt_to_equity:q?.debtToEquity??s.debt_to_equity,
+        eps_estimate_current:q?.epsCurrentYear??s.eps_estimate_current,
+        eps_estimate_next:q?.epsForward??s.eps_estimate_next
+      };
+      yahooCache.set(s.ticker,{at:now,data:d});
+      return {...s,...d,data_quality:"yahoo_finance2"};
+    }catch{return s}
+  }));
+}
+
 export async function GET(){
   const url=process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key=process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
@@ -17,6 +49,6 @@ export async function GET(){
     const am=new Map((analysis||[]).map(x=>[x.ticker,x]));
     const aim=new Map((aiRows||[]).map(x=>[x.ticker,x]));
     const stocks=(universe||[]).map(x=>({...x,...(fm.get(x.ticker)||{}),...(am.get(x.ticker)||{}),...(aim.get(x.ticker)||{})}));
-    return Response.json({stocks,meta:{universe:universe?.length||0,fundamentals:fundamentals?.length||0,analysis:analysis?.length||0,ai:aiRows?.length||0}});
+    const enriched=await yahooEnrich(stocks); return Response.json({stocks:enriched,meta:{universe:universe?.length||0,fundamentals:fundamentals?.length||0,analysis:analysis?.length||0,ai:aiRows?.length||0}});
   }catch(e){return Response.json({error:e?.message||"Stock API failed"},{status:500})}
 }
