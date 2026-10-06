@@ -72,7 +72,7 @@ async function calendar(tickers){
 
 export async function GET(request){
   const probe=new URL(request.url).searchParams.get("probe");
-  if(probe){const p=await alpha(probe.toUpperCase(),"EARNINGS");return NextResponse.json({probe:probe.toUpperCase(),ok:!!p.data,keys:p.data?Object.keys(p.data):[],quarterlyCount:p.data?.quarterlyEarnings?.length||0,error:p.error||null});}
+  if(probe){const p=await alpha(probe.toUpperCase(),"EARNINGS"),calProbe=await calendar([probe.toUpperCase()]);return NextResponse.json({probe:probe.toUpperCase(),earningsOk:!!p.data,quarterlyCount:p.data?.quarterlyEarnings?.length||0,earningsError:p.error||null,calendarCount:calProbe.rows.length,calendarError:calProbe.error||null,calendarSample:calProbe.rows.slice(0,2)});}
   const tickers=await getTickers(),stored=await getStored(),cal=await calendar(tickers);
   const rows=[],seen=new Set();
   for(const x of cal.rows){
