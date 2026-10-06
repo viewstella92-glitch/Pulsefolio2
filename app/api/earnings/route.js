@@ -70,29 +70,44 @@ async function calendar(tickers){
   }catch(e){return {rows:[],error:e?.message||"Calendar request failed"}}
 }
 
+async function getCache(){
+  const url=process.env.NEXT_PUBLIC_SUPABASE_URL,key=process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+  if(!url||!key)return [];
+  try{
+    const r=await fetch(url+"/rest/v1/stock_earnings_cache?select=ticker,report_date,fiscal_date_ending,estimated,eps_estimate,eps_actual,surprise,surprise_pct,history,trend,source,fetched_at&order=report_date.asc",{headers:{apikey:key,Authorization:"Bearer "+key},cache:"no-store"});
+    if(!r.ok)return [];
+    return await r.json();
+  }catch{return []}
+}
+
 export async function GET(){
-  const tickers=await getTickers(),stored=await getStored(),cal=await calendar(tickers);
-  const rows=[],seen=new Set();
-  for(const x of cal.rows){
-    const ticker=String(x.symbol||"").toUpperCase(),date=x.reportDate;if(!ticker||!date||seen.has(ticker))continue;
-    const d=new Date(date+"T00:00:00Z");if(Number.isNaN(d.getTime()))continue;
-    rows.push({ticker,date:d.toISOString(),estimated:true,epsEstimate:num(x.estimate),epsActual:null,surprise:null,surprisePct:null,history:[],trend:[],source:"Alpha Vantage Earnings Calendar"});seen.add(ticker);
-  }
-  for(const ticker of tickers){if(seen.has(ticker))continue;const x=stored.get(ticker);if(x?.earnings_date){rows.push({ticker,date:x.earnings_date,estimated:x.earnings_estimated!==false,epsEstimate:null,epsActual:null,surprise:null,surprisePct:null,history:[],trend:[],source:x.earnings_source||"Synced earnings source"});seen.add(ticker)}}
-  const historyErrors={};
-  // Fetch history/estimates for up to 6 rows. If the calendar provider returns no upcoming rows,
-  // use the latest reported earnings as a clearly-labeled fallback rather than returning an empty dashboard.
-  const historyTargets=rows.length?rows.slice(0,6):tickers.slice(0,6).map(t=>({ticker:t,date:null,estimated:false,epsEstimate:null,epsActual:null,surprise:null,surprisePct:null,history:[],trend:[],source:"Alpha Vantage Latest Reported Earnings"}));
-  for(const item of historyTargets){
-    const [h,e]=await Promise.all([alpha(item.ticker,"EARNINGS"),alpha(item.ticker,"EARNINGS_ESTIMATES")]);
-    if(h.data?.quarterlyEarnings?.length){
-      const hist=h.data.quarterlyEarnings;
-      item.history=hist.slice(0,8).map(q=>({fiscalDateEnding:q.fiscalDateEnding,reportedDate:q.reportedDate,reportedEPS:num(q.reportedEPS),estimatedEPS:num(q.estimatedEPS),surprise:num(q.surprise),surprisePercentage:num(q.surprisePercentage)}));
-      const latest= item.history[0];
-      if(latest){item.epsActual=latest.reportedEPS;item.epsEstimate=latest.estimatedEPS??item.epsEstimate;item.surprise=latest.surprise;item.surprisePct=latest.surprisePercentage;if(!item.date&&latest.reportedDate){item.date=new Date(latest.reportedDate+"T00:00:00Z").toISOString();item.estimated=false}}
-    }else if(h.error)historyErrors[item.ticker]=h.error;
-    if(e.data?.estimates?.length)item.trend=e.data.estimates.slice(0,8).map(q=>({fiscalDateEnding:q.fiscalDateEnding,epsEstimate:num(q.epsEstimate),epsHigh:num(q.epsHigh),epsLow:num(q.epsLow),revenueEstimate:num(q.revenueEstimate),revenueHigh:num(q.revenueHigh),revenueLow:num(q.revenueLow),analystCount:num(q.numberOfAnalysts),revisionUp:num(q.epsRevisionsUp),revisionDown:num(q.epsRevisionsDown)}));
-  }
-  rows.sort((a,b)=>new Date(a.date)-new Date(b.date));
-  return NextResponse.json({earnings:rows,updatedAt:new Date().toISOString(),tickerCount:tickers.length,coverage:rows.length,historyCoverage:rows.filter(x=>x.history.length).length,trendCoverage:rows.filter(x=>x.trend.length).length,sourceCoverage:rows.reduce((m,x)=>(m[x.source]=(m[x.source]||0)+1,m),{}),provider:cal.rows.length?"Alpha Vantage":"stored fallback",providerError:cal.error||null,historyErrors});
+  const tickers=await getTickers();
+  const allowed=new Set(tickers);
+  const cached=(await getCache()).filter(x=>allowed.has(String(x.ticker||"").toUpperCase()));
+  const rows=cached.map(x=>({
+    ticker:String(x.ticker).toUpperCase(),
+    date:x.report_date,
+    estimated:x.estimated!==false,
+    epsEstimate:num(x.eps_estimate),
+    epsActual:num(x.eps_actual),
+    surprise:num(x.surprise),
+    surprisePct:num(x.surprise_pct),
+    history:Array.isArray(x.history)?x.history:[],
+    trend:Array.isArray(x.trend)?x.trend:[],
+    source:x.source||"Supabase earnings cache",
+    fetchedAt:x.fetched_at
+  })).filter(x=>x.date);
+  const upcoming=rows.filter(x=>new Date(x.date)>=new Date()).length;
+  return NextResponse.json({
+    earnings:rows,
+    updatedAt:new Date().toISOString(),
+    tickerCount:tickers.length,
+    coverage:rows.length,
+    upcomingCoverage:upcoming,
+    historyCoverage:rows.filter(x=>x.history.length).length,
+    trendCoverage:rows.filter(x=>x.trend.length).length,
+    sourceCoverage:rows.reduce((m,x)=>(m[x.source]=(m[x.source]||0)+1,m),{}),
+    provider:"Supabase earnings cache",
+    providerError:rows.length?"": "Earnings provider cache is empty for some active tickers"
+  });
 }
