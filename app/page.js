@@ -48,9 +48,11 @@ function investmentDecision(s){
   const raw=valuationScore*.35+growthScore*.30+financial*.20+(risk??50)*.10+newsScore*.05;
   const score=clamp(raw*(0.65+0.35*coverage));
   const deterioration=clamp(100-riskPenalty-(growth!=null&&growth<5?12:0));
-  let label=score>=80?"น่าลงทุนมาก":score>=68?"น่าลงทุน":score>=55?"รอจังหวะ":score>=42?"ความเสี่ยงสูง":"ควรหลีกเลี่ยง";\n  if(coverage<0.75&&score>=68) label="รอจังหวะ";\n  if(beta==null) warnings.push("ยังไม่มี Beta ที่ยืนยันได้ จึงยังสรุปความเสี่ยงตลาดไม่ได้");
+  let label=score>=80?"น่าลงทุนมาก":score>=68?"น่าลงทุน":score>=55?"รอจังหวะ":score>=42?"ความเสี่ยงสูง":"ควรหลีกเลี่ยง";
+  if(coverage<0.75&&score>=68) label="รอจังหวะ";
   if(deterioration<45) label="ควรหลีกเลี่ยง";
   const warnings=[];
+  if(beta==null) warnings.push("ยังไม่มี Beta ที่ยืนยันได้ จึงยังสรุปความเสี่ยงตลาดไม่ได้");
   if(growth!=null&&growth<0) warnings.push("กำไรคาดว่าจะหดตัว");
   if(revenue!=null&&revenue<0) warnings.push("รายได้หดตัว");
   if(margin!=null&&margin<0) warnings.push("Margin ติดลบ");
