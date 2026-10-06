@@ -58,8 +58,8 @@ body{font-family:"Noto Sans Thai","Leelawadee UI",Tahoma,Inter,ui-sans-serif,sys
 .growthHighlight{display:flex;align-items:baseline;gap:10px;margin:0 0 12px;padding:12px 14px;border:1px solid #233754;background:#0c1726;border-radius:9px}.growthHighlight strong{font-size:28px}.growthHighlight span{font-size:11px;color:#9fb0c8}.positiveNews{display:grid;gap:8px}.positiveNews a{display:block;padding:10px 11px;border:1px solid #1d2c43;background:#0a111c;border-radius:8px;text-decoration:none;color:inherit}.positiveNews b{display:block;font-size:12px;line-height:1.55}.positiveNews small{display:block;margin-top:5px;font-size:10px;color:#8292aa}
 .priceOutlook{margin-top:10px;padding:10px 12px;border:1px solid #233754;background:#0c1726;border-radius:8px}.priceOutlook b{display:block;font-size:11px}.priceOutlook strong{display:block;font-size:23px;margin:3px 0}.priceOutlook small{font-size:10px;color:#8292aa}.newsPriceNote{margin:10px 0;padding:9px 11px;border:1px solid #26344a;background:#0a111c;border-radius:8px;color:#aebbd0;font-size:11px;line-height:1.6}
 /* Final Thai typography + analyst outlook */
-@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;500;600;700;800&display=swap');
-html,body{font-family:"Noto Sans Thai","Noto Sans","Leelawadee UI",Tahoma,sans-serif;font-size:15px;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+500;600;700;800&display=swap');
+html,body{font-family:var(--font-thai),var(--font-inter),"Leelawadee UI",Tahoma,sans-serif;font-size:15px;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
 body{line-height:1.65}
 .nav{font-size:14px;font-weight:600;line-height:1.5;padding:13px 14px}
 .brand b{font-size:18px}.brand small{font-size:10px}
@@ -178,3 +178,26 @@ footer{opacity:.7}
 @keyframes spin{to{transform:rotate(360deg)}}@keyframes riseIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
 @media(max-width:700px){.header{position:relative}.searchResults{width:100%;top:100%}.section{padding:16px}.hero{border-radius:16px}.metrics{gap:8px}.metric{padding:13px}.metric strong{font-size:21px}}
 @media(prefers-reduced-motion:reduce){*,*:before,*:after{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+
+/* Pulsefolio visual refresh */
+:root{--surface:#0d1522;--surface2:#111c2c;--border:#243653;--accent:#8290ff;--accent-soft:rgba(130,144,255,.12)}
+body{background:radial-gradient(1000px 520px at 72% -10%,rgba(130,144,255,.14),transparent 62%),radial-gradient(800px 500px at 5% 20%,rgba(65,210,176,.06),transparent 62%),#060912;color:#edf2f8;font-size:15px;line-height:1.65}
+.sidebar{width:238px;padding:24px 13px;background:rgba(7,11,19,.86);border-right:1px solid rgba(72,92,126,.28);box-shadow:18px 0 60px rgba(0,0,0,.18)}
+.brand{padding:0 10px 28px}.brandIcon{width:42px;height:42px;border-radius:14px;box-shadow:0 10px 30px rgba(124,140,255,.25)}.brand b{font-size:19px}.brand small{font-size:9px}
+.nav{font-size:13px;font-weight:650;padding:12px 13px;margin:4px 0;color:#8492a8}.nav.active{background:linear-gradient(100deg,rgba(130,144,255,.16),rgba(20,30,48,.72));border-color:#293b5b;box-shadow:inset 3px 0 var(--accent),0 8px 24px rgba(0,0,0,.12)}
+.main{margin-left:238px;width:calc(100% - 238px);max-width:1680px;padding:28px 44px 54px}.header{padding:8px 0 18px;margin-bottom:16px}.header h1{font-size:32px;letter-spacing:-1.2px}.eyebrow{font-size:10px;font-weight:800;color:#74839b}
+.searchbox{height:46px;width:360px;background:rgba(12,19,31,.82);border-color:#263a5a;border-radius:14px}.searchbox input{font-size:14px}
+.hero{padding:34px;border-radius:22px;background:linear-gradient(135deg,rgba(19,30,50,.98),rgba(9,15,25,.96));border-color:#2a3d5e}.hero h2{font-size:32px}.hero p{font-size:14px;max-width:760px;color:#91a0b5}.heroScore strong{font-size:58px}
+.metrics{gap:11px;margin:12px 0}.metric{background:linear-gradient(145deg,#0f1827,#0a111b);border-color:#1f304a;border-radius:14px}.metric span{font-size:11px}.metric strong{font-size:26px}
+.section{margin-top:16px;padding:22px;border-radius:17px;background:linear-gradient(145deg,rgba(12,19,31,.96),rgba(8,14,23,.94));border-color:#1e2f49}.sectionHead h3{font-size:18px}
+.opps{gap:10px}.opportunity{background:linear-gradient(145deg,#111c2c,#0b131f);border-color:#233652;border-radius:14px;padding:16px}.opportunity:hover{border-color:#526991;box-shadow:0 18px 38px rgba(0,0,0,.28)}
+.score{width:46px;height:46px}.badge{font-size:10px}.miniVal{font-size:11px}
+.rankRow{padding:14px 12px;border-color:#1b2a42}.rankRow:hover{background:#111c2b}
+.newsItem,.earnCard,.holding{background:#0d1724;border-color:#20314c;border-radius:11px}.newsItem:hover,.holding:hover{border-color:#4a638b}
+.drawerBack{background:rgba(2,5,10,.72);backdrop-filter:blur(10px)}.drawer{width:min(650px,100%);padding:31px;background:linear-gradient(180deg,#0b1320,#070d15);border-left-color:#2b3e5e}.drawerTop h2{font-size:40px}.block{padding-top:21px}.dataGrid div{background:#0d1724;border-color:#20314c}
+.businessDecision{background:linear-gradient(145deg,#0e1928,#09121d);border-color:#2a405f;border-radius:14px}.decisionScore b{font-size:31px}.decisionGrid>div{background:#0a131f;border-color:#20334e}.decisionGrid b{font-size:18px}
+.investmentPick{background:linear-gradient(145deg,#101b2b,#0b131f);border-color:#263b59;border-radius:13px}.investmentPick:hover{border-color:#6279a4;transform:translateY(-1px)}
+.priceScenario{background:linear-gradient(145deg,#0f1a29,#09121d);border-color:#2a405f;border-radius:14px}.scenarioCard{background:#0a131f;border-color:#223650;border-radius:10px}.scenarioCard.down{border-color:#54333e}.scenarioCard.up{border-color:#2d5946}
+.scoreExplain{grid-template-columns:repeat(4,1fr)}.explain{background:#0c1623;border-color:#20334e;border-radius:10px}.explain strong{color:#aab4ff}
+@media(max-width:1100px){.main{padding-left:28px;padding-right:28px}.searchbox{width:320px}.scoreExplain{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:700px){.sidebar{width:64px}.main{margin-left:64px;width:calc(100% - 64px);padding:18px 12px 40px}.header{padding-bottom:12px}.header h1{font-size:25px}.searchbox{width:100%}.hero{padding:23px;border-radius:17px}.hero h2{font-size:25px}.section{padding:16px}.drawer{padding:22px 17px}.scoreExplain{grid-template-columns:1fr}.opportunity{padding:14px}}
