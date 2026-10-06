@@ -104,7 +104,7 @@ export default function Home(){
   const ranked=useMemo(()=>[...merged].sort((a,b)=>Number(b.overall_score||0)-Number(a.overall_score||0)),[merged]);
   const filtered=ranked.filter(s=>(s.ticker+" "+s.name).toLowerCase().includes(search.toLowerCase()));
   const decisions=useMemo(()=>merged.map(s=>({...s,investmentDecision:investmentDecision(s)})).sort((a,b)=>b.investmentDecision.score-a.investmentDecision.score),[merged]);
-  const investmentPicks=decisions.slice(0,5);
+  const investmentPicks=decisions.filter(s=>s.investmentDecision.score!=null).slice(0,5);
   const buys=ranked.filter(s=>["BUY","STRONG BUY"].includes(s.buy_zone)).slice(0,5);
   const watchRows=ranked.filter(s=>watch.includes(s.ticker));
   const newsRows=search?news.filter(n=>(n.ticker+" "+n.title).toLowerCase().includes(search.toLowerCase())).slice(0,20):news.slice(0,12);
@@ -146,7 +146,7 @@ function CompareView({stocks,selected,setSelected,onOpen}){
  const [aiText,setAiText]=useState(""),[aiLoading,setAiLoading]=useState(false);
  const rows=selected.map(t=>stocks.find(s=>s.ticker===t)).filter(Boolean);
  const scored=rows.map(s=>({...s,decision:investmentDecision(s)}));
- const best=[...scored].sort((a,b)=>b.decision.score-a.decision.score)[0];
+ const best=[...scored].filter(x=>x.decision.score!=null).sort((a,b)=>b.decision.score-a.decision.score)[0];
  const toggle=t=>setSelected(v=>v.includes(t)?v.filter(x=>x!==t):v.length<4?[...v,t]:v);
  async function ask(){if(rows.length<2)return;setAiLoading(true);setAiText("");try{const q="เปรียบเทียบหุ้น "+rows.map(x=>x.ticker).join(" vs ")+" จากข้อมูลล่าสุดในระบบ บอกว่าตัวไหนน่าสนใจกว่า เหตุผลหลัก จุดแข็ง จุดเสี่ยง และ valuation โดยห้ามสร้างตัวเลขเอง";const r=await fetch("/api/ai/chat",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({message:q})});const d=await r.json();setAiText(d.text||d.error||"AI ยังไม่ตอบ")}catch{setAiText("เชื่อมต่อ AI ไม่สำเร็จ")}finally{setAiLoading(false)}}
  return <div className="comparePage">
