@@ -42,7 +42,7 @@ async function calendar(tickers){
   const key=process.env.ALPHAVANTAGE_API_KEY;
   if(!key)return {rows:[],error:"ALPHAVANTAGE_API_KEY is not configured"};
   try{
-    const r=await fetch("https://www.alphavantage.co/query?function=EARNINGS_CALENDAR&horizon=3month&datatype=csv&apikey="+encodeURIComponent(key),{cache:"no-store",signal:AbortSignal.timeout(12000)});
+    const r=await fetch("https://www.alphavantage.co/query?function=EARNINGS_CALENDAR&horizon=3month"+(tickers.length===1?"&symbol="+encodeURIComponent(tickers[0]):"")+"&datatype=csv&apikey="+encodeURIComponent(key),{cache:"no-store",signal:AbortSignal.timeout(12000)});
     if(!r.ok)return {rows:[],error:"Alpha Vantage HTTP "+r.status};
     const text=await r.text();
     if(text.trim().startsWith("{")){
