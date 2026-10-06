@@ -32,15 +32,10 @@ async function getEarningsToday(ticker){
     const r=await fetch("https://www.earningstoday.com/stocks/"+encodeURIComponent(ticker)+"/earnings-date",{headers:{"User-Agent":UA},cache:"no-store"});
     if(!r.ok)return null;
     const html=await r.text();
-    const patterns=[
-      /(?:Est\\.? Earnings|Earnings Date)\\s*[:\\-]?\\s*([A-Z][a-z]{2}\\s+\\d{1,2}(?:,\\s*\\d{4})?)/i,
-      /earningsDate.{0,30}(\\d{4}-\\d{2}-\\d{2})/i
-    ];
-    let value=null;
-    for(const p of patterns){const m=html.match(p);if(m){value=m[1];break;}}
-    if(!value)return null;
-    const iso=/^\\d{4}-\\d{2}-\\d{2}$/.test(value)?value:value.replace(/^(\\d{1,2})\\/(\\d{1,2})\\/(\\d{4})$/,"$3-$1-$2");
-    const date=new Date(iso+"T00:00:00Z");
+    const text=html.replace(/<[^>]+>/g," ").replace(/&nbsp;/g," ").replace(/&amp;/g,"&").replace(/\\s+/g," ").trim();
+    const m=text.match(/Next earnings report\\s+([A-Za-z]+\\s+\\d{1,2},\\s+\\d{4})/i);
+    if(!m)return null;
+    const date=new Date(m[1]);
     if(Number.isNaN(date.getTime()))return null;
     return {ticker,date:date.toISOString(),estimated:true,history:[],trend:[],source:"EarningsToday"};
   }catch{return null}
@@ -51,15 +46,10 @@ async function getStockAnalysis(ticker){
     const r=await fetch("https://stockanalysis.com/stocks/"+encodeURIComponent(ticker)+"/",{headers:{"User-Agent":UA},cache:"no-store"});
     if(!r.ok)return null;
     const html=await r.text();
-    const text=html.replace(/<[^>]+>/g," ").replace(/&nbsp;/g," ").replace(/&amp;/g,"&").replace(/\s+/g," ").trim();
-    const patterns=[
-      /(?:Est\\.? Earnings|Earnings Date)\\s*[:\\-]?\\s*([A-Z][a-z]{2}\\s+\\d{1,2}(?:,\\s*\\d{4})?)/i,
-      /earningsDate[^0-9]{0,30}(\\d{4}-\\d{2}-\\d{2})/i
-    ];
-    let value=null;
-    for(const p of patterns){const m=text.match(p);if(m){value=m[1];break;}}
-    if(!value)return null;
-    const date=new Date(value);
+    const text=html.replace(/<[^>]+>/g," ").replace(/&nbsp;/g," ").replace(/&amp;/g,"&").replace(/\\s+/g," ").trim();
+    const m=text.match(/Earnings Date\\s+([A-Za-z]+\\s+\\d{1,2},?\\s+\\d{4})/i);
+    if(!m)return null;
+    const date=new Date(m[1]);
     if(Number.isNaN(date.getTime()))return null;
     return {ticker,date:date.toISOString(),estimated:true,history:[],trend:[],source:"StockAnalysis / S&P Global"};
   }catch{return null}
