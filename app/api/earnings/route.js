@@ -33,9 +33,8 @@ async function getEarningsToday(ticker){
     if(!r.ok)return null;
     const html=await r.text();
     const patterns=[
-      /dateTime(?:\\?["']|["'])\\s*:\\s*(?:\\?["']|["'])(\\d{4}-\\d{2}-\\d{2})/i,
-      /earningsDate(?:\\?["']|["'])\\s*:\\s*(?:\\?["']|["'])(\\d{4}-\\d{2}-\\d{2})/i,
-      /Earnings Date[^A-Za-z0-9]{0,30}(\\d{1,2}\\/\\d{1,2}\\/\\d{4})/i
+      /(?:Est\\.? Earnings|Earnings Date)\\s*[:\\-]?\\s*([A-Z][a-z]{2}\\s+\\d{1,2}(?:,\\s*\\d{4})?)/i,
+      /earningsDate.{0,30}(\\d{4}-\\d{2}-\\d{2})/i
     ];
     let value=null;
     for(const p of patterns){const m=html.match(p);if(m){value=m[1];break;}}
