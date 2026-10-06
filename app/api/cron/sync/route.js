@@ -48,7 +48,7 @@ export async function GET(req){
       const rows=await Promise.all(batch.map(async ticker=>[ticker,await getAnalyst(ticker)]));
       for(const [ticker,data] of rows)if(data)seed[ticker]=data;
     }
-    const functions=process.env.SUPABASE_FUNCTIONS_URL||supabase.replace(/\\/$/,"")+"/functions/v1";
+    const functions=process.env.SUPABASE_FUNCTIONS_URL||(supabase.endsWith("/")?supabase.slice(0,-1):supabase)+"/functions/v1";
     const r=await fetch(functions+"/pulse-sync",{method:"POST",headers:{"Content-Type":"application/json",...headers},body:JSON.stringify({tickers,seed}),cache:"no-store"});
     const data=await r.json().catch(()=>({}));
     const e=await fetch(functions+"/estimate-sync",{method:"POST",headers,cache:"no-store"});
