@@ -31,12 +31,12 @@ async function getStockAnalysis(ticker){
   try{
     const r=await fetch("https://stockanalysis.com/stocks/"+encodeURIComponent(ticker)+"/",{headers:{"User-Agent":"Mozilla/5.0"},cache:"no-store"});
     if(!r.ok)return null;
-    const text=(await r.text()).replace(/<[^>]+>/g," ").replace(/&nbsp;/g," ").replace(/&amp;/g,"&").replace(/\\s+/g," ").trim();
+    const text=(await r.text()).replace(/<[^>]+>/g," ").replace(/&nbsp;/g," ").replace(/&amp;/g,"&").replace(/\s+/g," ").trim();
     const m=text.match(/(?:Est\. Earnings|Earnings Date)\\s+([A-Z][a-z]{2}\\s+\\d{1,2}(?:,\\s*\\d{4})?)/i);
     if(!m)return null;
     let date=new Date(m[1]);
     if(Number.isNaN(date.getTime()))return null;
-    if(!/\\d{4}/.test(m[1]))date=new Date(m[1]+", 2026");
+    if(!/\d{4}/.test(m[1]))date=new Date(m[1]+", 2026");
     return {ticker,date:date.toISOString(),estimated:true,history:[],trend:[],source:"StockAnalysis / S&P Global"};
   }catch{return null}
 }
