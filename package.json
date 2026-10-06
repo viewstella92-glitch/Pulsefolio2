@@ -2,7 +2,9 @@
   "name": "personal-stock-tracker",
   "version": "1.0.0",
   "private": true,
-  "engines": { "node": "22.x" },
+  "engines": {
+    "node": "22.x"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -11,6 +13,7 @@
   "dependencies": {
     "next": "15.5.7",
     "react": "19.1.2",
-    "react-dom": "19.1.2"
+    "react-dom": "19.1.2",
+    "yahoo-finance2": "4.0.2"
   }
 }
