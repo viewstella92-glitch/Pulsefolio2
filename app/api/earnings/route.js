@@ -45,11 +45,28 @@ async function calendar(tickers){
     const r=await fetch("https://www.alphavantage.co/query?function=EARNINGS_CALENDAR&horizon=3month&apikey="+encodeURIComponent(key),{cache:"no-store",signal:AbortSignal.timeout(12000)});
     if(!r.ok)return {rows:[],error:"Alpha Vantage HTTP "+r.status};
     const text=await r.text();
-    if(text.trim().startsWith("{")){try{const j=JSON.parse(text);return {rows:[],error:j.Note||j.Information||j["Error Message"]||"No calendar data"}}catch{}}
-    const lines=text.split(/\r?\n/).filter(Boolean); if(!lines.length)return {rows:[],error:"Empty calendar"};
-    const parse=line=>{const out=[];let cur="",q=false;for(let i=0;i<line.length;i++){const c=line[i];if(c==="""&&line[i+1]==="""){cur+=""";i++;continue}if(c==="""){q=!q;continue}if(c===","&&!q){out.push(cur);cur="";continue}cur+=c}out.push(cur);return out};
-    const h=parse(lines[0]).map(x=>x.trim().toLowerCase()), wanted=new Set(tickers);
-    return {rows:lines.slice(1).map(line=>Object.fromEntries(h.map((k,i)=>[k,(parse(line)[i]||"").trim()]))).filter(x=>wanted.has(String(x.symbol||"").toUpperCase()))};
+    if(text.trim().startsWith("{")){
+      try{const j=JSON.parse(text);return {rows:[],error:j.Note||j.Information||j["Error Message"]||"No calendar data"}}catch{}
+    }
+    const parse=line=>{
+      const out=[];let cur="",quoted=false;
+      for(let i=0;i<line.length;i++){
+        const c=line[i];
+        if(c==='"'&&line[i+1]==='"'){cur+='"';i++;continue}
+        if(c==='"'){quoted=!quoted;continue}
+        if(c===','&&!quoted){out.push(cur);cur="";continue}
+        cur+=c;
+      }
+      out.push(cur);
+      return out;
+    };
+    const lines=text.split(/\r?\n/).filter(Boolean);
+    if(!lines.length)return {rows:[],error:"Empty calendar"};
+    const headers=parse(lines[0]).map(x=>x.trim().toLowerCase()),wanted=new Set(tickers);
+    return {rows:lines.slice(1).map(line=>{
+      const cells=parse(line);
+      return Object.fromEntries(headers.map((k,i)=>[k,(cells[i]||"").trim()]));
+    }).filter(x=>wanted.has(String(x.symbol||"").toUpperCase()))};
   }catch(e){return {rows:[],error:e?.message||"Calendar request failed"}}
 }
 
