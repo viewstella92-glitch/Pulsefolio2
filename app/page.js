@@ -250,7 +250,8 @@ function หุ้นDrawer({insights:insight,stock:s,onClose,onAI,ai,aiLoading,
  const pegReliable=!((s.industry||"").toLowerCase().includes("semiconductor")||((s.sector||"").toLowerCase().includes("consumer")&&Number(s.growth_current||0)>Number(s.growth_next||0)*1.8));
  function saveHolding(){const q=Number(qty),a=Number(avg);if(q>0&&a>0)setพอร์ตลงทุน(p=>({...p,[s.ticker]:{qty:q,avg:a}}));else setพอร์ตลงทุน(p=>{const x={...p};delete x[s.ticker];return x})}
  return <div className="drawerBack" onMouseDown={onClose}><aside className="drawer" onMouseDown={e=>e.stopPropagation()}><button className="close" onClick={onClose}>×</button>
- <div className="drawerTop"><div><span className="eyebrow">{s.sector} · {s.industry}</span><h2>{s.ticker}</h2><p>{s.name}</p></div><div className={scoreClass(s.overall_score)}>{fmt(s.overall_score,0)}</div></div>
+ const decision=investmentDecision(s);
+ <div className="drawerTop"><div><span className="eyebrow">{s.sector} · {s.industry}</span><h2>{s.ticker}</h2><p>{s.name}</p></div><div className={scoreClass(decision.score)}>{fmt(decision.score,0)}</div></div>
  <div className="priceLine"><strong>{usd(price)}</strong><span>มูลค่ายุติธรรม {usd(s.fair_value_base)}</span><span className={upside>=0?"up":"down"}>{upside==null?"—":(upside>=0?"+":"")+fmt(upside,1)+"%"}</span></div><div className="freshness">อัปเดตข้อมูล {s.updated_at?new Date(s.updated_at).toLocaleString("en-US",{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"}):"—"} · {s.data_source||"Supabase"}</div>
  <div className="actions2"><button className="primary" onClick={()=>setWatch(w=>isWatch?w.filter(x=>x!==s.ticker):[...w,s.ticker])}>{isWatch?"✓ ✓ อยู่ในรายการติดตาม":"+ + เพิ่มในรายการติดตาม"}</button><button className="secondary" onClick={onAI}>{aiLoading?"กำลังวิเคราะห์…":"ให้ Gemini วิเคราะห์"}</button><button className="dangerBtn" onClick={onRemove}>ลบหุ้นออก</button></div>
  <div className="zone"><span className={"badge "+badgeClass(investmentDecision(s).label)}>{investmentDecision(s).label}</span><div><small>ช่วงมูลค่ายุติธรรม</small><b>{usd(s.fair_value_low)} / {usd(s.fair_value_base)} / {usd(s.fair_value_high)}</b></div></div>
@@ -268,17 +269,20 @@ function หุ้นDrawer({insights:insight,stock:s,onClose,onAI,ai,aiLoading,
 }
 function BusinessDecision({stock:s}){
  const d=investmentDecision(s);
+ const action=d.label==="น่าลงทุนมาก"||d.label==="น่าลงทุน"?"เข้าได้ถ้ารับความเสี่ยงได้":d.label==="รอจังหวะ"?"ธุรกิจอาจดี แต่ราคาหรือความเสี่ยงยังไม่คุ้ม":d.label==="ข้อมูลไม่ครบ"?"ยังไม่ควรตัดสินใจ":"ยังไม่ควรเข้าลงทุน";
+ const next=d.label==="รอจังหวะ"?(d.fairUpside!=null&&d.fairUpside>0?"รอราคาย่อลง/ให้ Upside ดีขึ้น":"รอข้อมูลกำไรและ Valuation ชัดขึ้น"):(d.warnings[0]||"ติดตามงบและประมาณการครั้งถัดไป");
  return <section className={"businessDecision "+(d.score>=68?"good":d.score<45?"bad":"wait")}>
   <div className="decisionTop"><div><span className="eyebrow">INVESTMENT DECISION</span><h3>สรุปว่าหุ้นนี้น่าลงทุนไหม?</h3></div><strong>{d.label}</strong></div>
   <div className="decisionScore"><span>Investment Score</span><b>{fmt(d.score,0)}</b><small>/ 100</small></div>
-  <div className="decisionGrid"><div><span>สุขภาพธุรกิจ</span><b>{fmt(d.business,0)}</b></div><div><span>ฐานะการเงิน</span><b>{fmt(d.financial,0)}</b></div><div><span>Valuation</span><b>{fmt(d.valuation,0)}</b></div><div><span>ความเสี่ยง</span><b>{fmt(d.risk,0)}</b></div></div><div className="decisionConfidence">ความครบถ้วนของข้อมูล {fmt((d.coverage||0)*100,0)}% · ความมั่นใจ {d.confidence}</div>
-  <div className="decisionWhy"><b>อุตสาหกรรม:</b> {d.industry}<br/><b>ปัจจัยบวก:</b> {d.positives.length?d.positives.join(" · "):"ยังไม่มีข้อมูลเพียงพอ"}{d.warnings.length?<><br/><b>สัญญาณเตือน:</b> {d.warnings.join(" · ")}</>:""}</div>
-  <small>คะแนนนี้เป็นการคำนวณจากข้อมูลพื้นฐานที่มีอยู่จริงและ KPI ที่ปรับตามกลุ่มอุตสาหกรรม ไม่ใช่คำแนะนำซื้อขาย และจะถูกปรับเมื่อข้อมูลใหม่เข้ามา</small>
+  <div className="decisionGrid"><div><span>สุขภาพธุรกิจ</span><b>{fmt(d.business,0)}</b></div><div><span>ฐานะการเงิน</span><b>{fmt(d.financial,0)}</b></div><div><span>Valuation</span><b>{fmt(d.valuation,0)}</b></div><div><span>ความเสี่ยง</span><b>{fmt(d.risk,0)}</b></div></div>
+  <div className="decisionConfidence">ข้อมูลครบ {fmt((d.coverage||0)*100,0)}% · ความมั่นใจ {d.confidence} · โอกาส {fmt(d.opportunity,0)}</div>
+  <div className="decisionWhy"><b>คำตัดสิน:</b> {action}<br/><b>สิ่งที่ต้องรอ/จับตา:</b> {next}<br/><b>ปัจจัยบวก:</b> {d.positives.length?d.positives.join(" · "):"ยังไม่มีข้อมูลเพียงพอ"}{d.warnings.length?<><br/><b>สัญญาณเตือน:</b> {d.warnings.join(" · ")}</>:""}</div>
+  <small>คะแนนใช้ข้อมูลพื้นฐาน Valuation Growth Quality Risk และข่าวที่มีจริง โดยลดความมั่นใจเมื่อข้อมูลไม่ครบ ไม่ใช่คำแนะนำซื้อขาย และไม่มีการรับประกันผลตอบแทน</small>
  </section>
 }
 function InvestmentSnapshot({stock:s,price,upside}){
- const target=extractAnalystTarget(s.news||[],price);
- const scores=[["มูลค่า",s.valuation_score],["เติบโต",s.growth_score],["คุณภาพ",s.quality_score],["ความเสี่ยง",s.risk_score]];
+ const target=extractAnalystTarget(s.news||[],price),d=investmentDecision(s);
+ const scores=[["มูลค่า",d.valuation],["เติบโต",d.business],["คุณภาพ",d.financial],["ความเสี่ยง",d.risk]];
  const positive=(s.growth_next!=null&&Number(s.growth_next)>0)||(target&&target.upside>0)||(upside!=null&&upside>0);
  return <section className="investmentSnapshot">
   <div className="snapshotHead"><div><span className="eyebrow">INVESTMENT SNAPSHOT</span><h3>สรุปภาพรวมหุ้นตัวนี้</h3></div><span className={"snapshotSignal "+(positive?"positive":"neutral")}>{positive?"มีปัจจัยสนับสนุน":"ต้องติดตาม"}</span></div>
