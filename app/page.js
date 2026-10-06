@@ -56,8 +56,10 @@ function investmentDecision(s){
   if(fcf!=null&&fcf<0)risk-=16;
   if(!financialSector&&debt!=null&&debt>150)risk-=12;
   risk=clamp(risk);
-  const news=num(s.news_score);
-  const raw=valuationScore*.32+business*.28+financial*.25+risk*.10+(news==null?0:clamp(news)*.05);
+  const news=num(s.news_score), revision=num(s.earnings_revision_score);
+  const revisionWeight=revision==null?0:.05, newsWeight=news==null?0:.03;
+  const totalWeight=.30+.27+.25+.10+revisionWeight+newsWeight;
+  const raw=(valuationScore*.30+business*.27+financial*.25+risk*.10+(revision==null?0:revision*revisionWeight)+(news==null?0:clamp(news)*newsWeight))/totalWeight;
   const score=clamp(raw*(.78+.22*coverage)-qualityPenalty);
   const deterioration=clamp(100-(growth!=null&&growth<5?12:0)-(revenue!=null&&revenue<5?8:0)-(margin!=null&&margin<10?8:0)-(fcf!=null&&fcf<0?18:0));
   let label=score>=84?"น่าลงทุนมาก":score>=72?"น่าลงทุน":score>=57?"รอจังหวะ":score>=43?"ความเสี่ยงสูง":"ควรหลีกเลี่ยง";
@@ -76,6 +78,8 @@ function investmentDecision(s){
   if(!financialSector&&debt!=null&&debt>150)warnings.push("หนี้สินต่อทุนสูง");
   if(pe!=null&&growth!=null&&growth>0&&pe/growth>2)warnings.push("Valuation สูงเมื่อเทียบกับ Growth");
   if(fairUpside!=null&&fairUpside<-10)warnings.push("ราคาสูงกว่า Fair Value Base");
+  if(revision!=null&&revision<40)warnings.push("นักวิเคราะห์กำลังปรับประมาณการ EPS ลง");
+  if(revision!=null&&revision>=65)positives.push("ประมาณการ EPS มีแรงปรับขึ้น");
   if(financialSector&&debt!=null)warnings.push("D/E ของ Financials ใช้เป็นตัวประกอบ ไม่ใช่ตัวตัดสินหลัก");
   if(growth!=null&&growth>=15)positives.push("Growth แข็งแรง");
   if(revenue!=null&&revenue>=10)positives.push("รายได้เติบโตดี");
