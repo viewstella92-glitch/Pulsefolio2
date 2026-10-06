@@ -58,7 +58,6 @@ body{font-family:"Noto Sans Thai","Leelawadee UI",Tahoma,Inter,ui-sans-serif,sys
 .growthHighlight{display:flex;align-items:baseline;gap:10px;margin:0 0 12px;padding:12px 14px;border:1px solid #233754;background:#0c1726;border-radius:9px}.growthHighlight strong{font-size:28px}.growthHighlight span{font-size:11px;color:#9fb0c8}.positiveNews{display:grid;gap:8px}.positiveNews a{display:block;padding:10px 11px;border:1px solid #1d2c43;background:#0a111c;border-radius:8px;text-decoration:none;color:inherit}.positiveNews b{display:block;font-size:12px;line-height:1.55}.positiveNews small{display:block;margin-top:5px;font-size:10px;color:#8292aa}
 .priceOutlook{margin-top:10px;padding:10px 12px;border:1px solid #233754;background:#0c1726;border-radius:8px}.priceOutlook b{display:block;font-size:11px}.priceOutlook strong{display:block;font-size:23px;margin:3px 0}.priceOutlook small{font-size:10px;color:#8292aa}.newsPriceNote{margin:10px 0;padding:9px 11px;border:1px solid #26344a;background:#0a111c;border-radius:8px;color:#aebbd0;font-size:11px;line-height:1.6}
 /* Final Thai typography + analyst outlook */
-500;600;700;800&display=swap');
 html,body{font-family:var(--font-thai),var(--font-inter),"Leelawadee UI",Tahoma,sans-serif;font-size:15px;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
 body{line-height:1.65}
 .nav{font-size:14px;font-weight:600;line-height:1.5;padding:13px 14px}
