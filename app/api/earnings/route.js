@@ -29,25 +29,39 @@ async function getYahoo(ticker){
 
 async function getEarningsToday(ticker){
   try{
-    const r=await fetch("https://www.earningstoday.com/stocks/"+encodeURIComponent(ticker)+"/earnings-date",{headers:{"User-Agent":"Mozilla/5.0"},cache:"no-store"});
+    const r=await fetch("https://www.earningstoday.com/stocks/"+encodeURIComponent(ticker)+"/earnings-date",{headers:{"User-Agent":UA},cache:"no-store"});
     if(!r.ok)return null;
     const html=await r.text();
-    const m=html.match(/dateTime\\?":\\?"(\\d{4}-\\d{2}-\\d{2})/);
-    if(!m)return null;
-    return {ticker,date:new Date(m[1]+"T00:00:00Z").toISOString(),estimated:true,history:[],trend:[],source:"EarningsToday"};
+    const patterns=[
+      /dateTime(?:\\?["']|["'])\\s*:\\s*(?:\\?["']|["'])(\\d{4}-\\d{2}-\\d{2})/i,
+      /earningsDate(?:\\?["']|["'])\\s*:\\s*(?:\\?["']|["'])(\\d{4}-\\d{2}-\\d{2})/i,
+      /Earnings Date[^A-Za-z0-9]{0,30}(\\d{1,2}\\/\\d{1,2}\\/\\d{4})/i
+    ];
+    let value=null;
+    for(const p of patterns){const m=html.match(p);if(m){value=m[1];break;}}
+    if(!value)return null;
+    const iso=/^\\d{4}-\\d{2}-\\d{2}$/.test(value)?value:value.replace(/^(\\d{1,2})\\/(\\d{1,2})\\/(\\d{4})$/,"$3-$1-$2");
+    const date=new Date(iso+"T00:00:00Z");
+    if(Number.isNaN(date.getTime()))return null;
+    return {ticker,date:date.toISOString(),estimated:true,history:[],trend:[],source:"EarningsToday"};
   }catch{return null}
 }
 
 async function getStockAnalysis(ticker){
   try{
-    const r=await fetch("https://stockanalysis.com/stocks/"+encodeURIComponent(ticker)+"/",{headers:{"User-Agent":"Mozilla/5.0"},cache:"no-store"});
+    const r=await fetch("https://stockanalysis.com/stocks/"+encodeURIComponent(ticker)+"/",{headers:{"User-Agent":UA},cache:"no-store"});
     if(!r.ok)return null;
-    const text=(await r.text()).replace(/<[^>]+>/g," ").replace(/&nbsp;/g," ").replace(/&amp;/g,"&").replace(/\s+/g," ").trim();
-    const m=text.match(/(?:Est\. Earnings|Earnings Date)\\s+([A-Z][a-z]{2}\\s+\\d{1,2}(?:,\\s*\\d{4})?)/i);
-    if(!m)return null;
-    let date=new Date(m[1]);
+    const html=await r.text();
+    const text=html.replace(/<[^>]+>/g," ").replace(/&nbsp;/g," ").replace(/&amp;/g,"&").replace(/\s+/g," ").trim();
+    const patterns=[
+      /(?:Est\\.? Earnings|Earnings Date)\\s*[:\\-]?\\s*([A-Z][a-z]{2}\\s+\\d{1,2}(?:,\\s*\\d{4})?)/i,
+      /earningsDate[^0-9]{0,30}(\\d{4}-\\d{2}-\\d{2})/i
+    ];
+    let value=null;
+    for(const p of patterns){const m=text.match(p);if(m){value=m[1];break;}}
+    if(!value)return null;
+    const date=new Date(value);
     if(Number.isNaN(date.getTime()))return null;
-    if(!/\d{4}/.test(m[1]))date=new Date(m[1]+", 2026");
     return {ticker,date:date.toISOString(),estimated:true,history:[],trend:[],source:"StockAnalysis / S&P Global"};
   }catch{return null}
 }
