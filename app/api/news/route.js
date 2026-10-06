@@ -1,6 +1,17 @@
 import { NextResponse } from "next/server";
 
-const TICKERS=["NVDA","CRM","CI","MU","ADBE","APP","INTU","NFLX","VRT","MELI","GRAB","ZTS","AZO","BLK","MA","AAPL","ARM","ALAB"];
+const FALLBACK_TICKERS=["NVDA","CRM","CI","MU","ADBE","APP","INTU","NFLX","VRT","MELI","GRAB","ZTS","AZO","BLK","MA","AAPL","ARM","ALAB"];
+async function getTickers(){
+  const url=process.env.NEXT_PUBLIC_SUPABASE_URL,key=process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+  if(!url||!key)return FALLBACK_TICKERS;
+  try{
+    const r=await fetch(url+"/rest/v1/stock_universe?select=ticker&active=eq.true",{headers:{apikey:key,Authorization:"Bearer "+key},cache:"no-store"});
+    if(!r.ok)return FALLBACK_TICKERS;
+    const rows=await r.json();
+    const tickers=rows.map(x=>x.ticker).filter(Boolean);
+    return tickers.length?tickers:FALLBACK_TICKERS;
+  }catch{return FALLBACK_TICKERS}
+}
 function clean(s=""){return s.replace(/<[^>]*>/g,"").replace(/<!\[CDATA\[|\]\]>/g,"").replace(/&amp;/g,"&").replace(/&quot;/g,'"').replace(/&#39;/g,"'").trim();}
 function tag(xml,name){const m=xml.match(new RegExp("<"+name+"[^>]*>([\\s\\S]*?)</"+name+">","i"));return m?clean(m[1]):"";}
 async function feed(ticker){
