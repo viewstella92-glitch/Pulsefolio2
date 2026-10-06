@@ -23,7 +23,7 @@ async function getStored(){
   }catch{return new Map()}
 }
 
-function num(v){const n=Number(v);return Number.isFinite(n)?n:null}
+function num(v){if(v==null||v==="")return null;const n=Number(v);return Number.isFinite(n)?n:null}
 
 async function alpha(symbol,fn){
   const key=process.env.ALPHAVANTAGE_API_KEY;
