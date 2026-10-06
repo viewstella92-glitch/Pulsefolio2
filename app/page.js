@@ -28,27 +28,29 @@ function metricScore(v,good,bad){
 function investmentDecision(s){
   const profile=industryProfile(s);
   const growthForecast=num(s.growth_next),growthHistorical=num(s.growth_current),growth=growthForecast??growthHistorical;
-  const revenue=num(s.revenue_growth),margin=num(s.profit_margin),roe=num(s.roe),fcf=num(s.free_cash_flow),debt=num(s.debt_to_equity);
+  const revenue=num(s.revenue_growth),margin=num(s.profit_margin),roe=num(s.roe),fcf=num(s.free_cash_flow);
+  const rawDebt=num(s.debt_to_equity),debt=rawDebt!=null&&rawDebt>=0?rawDebt:null;
   const forwardPe=num(s.forward_pe),trailingPe=num(s.trailing_pe),pe=forwardPe??trailingPe;
   const peBasis=forwardPe!=null?"Forward P/E":"Trailing P/E";
   const peg=num(s.peg),beta=num(s.beta),price=num(s.price),fair=num(s.fair_value_base),industryPe=num(s.industry_forward_pe);
+  const hasForwardGrowth=growthForecast!=null;
+  const hasForwardPE=forwardPe!=null;
+  const hasBenchmark=industryPe!=null||fair!=null;
   const core={growth,revenue,margin,roe,fcf,debt,pe,peg};
   const available=Object.values(core).filter(v=>v!=null).length;
   const coverage=available/8;
   const quality=s.data_quality||"unknown";
-  let qualityPenalty=3;
-  if(quality==="web_verified"||quality==="yahoo_finance2") qualityPenalty=0;
-  else if(quality==="quote_fallback") qualityPenalty=6;
+  const trusted=quality==="web_verified"||quality==="yahoo_finance2";
+  const enriched=quality==="timeseries_enriched";
+  const qualityPenalty=trusted?0:enriched?2:6;
 
   const growthScore=growth==null?null:clamp(50+growth*1.8);
   const revenueScore=revenue==null?null:clamp(50+revenue*1.5);
   const marginScore=margin==null?null:clamp(42+margin*1.8);
   const roeScore=roe==null?null:clamp(50+roe*1.2);
-  let fcfScore=null;
-  if(fcf!=null) fcfScore=fcf>0?72:22;
+  const fcfScore=fcf==null?null:(fcf>0?72:22);
   const financialSector=profile.name==="Financials";
-  let debtScore=null;
-  if(debt!=null) debtScore=financialSector?60:clamp(90-debt*.28);
+  const debtScore=debt==null?null:(financialSector?60:clamp(90-debt*.28));
 
   const weighted=(items)=>{
     const valid=items.filter(([,v])=>v!=null);
@@ -74,24 +76,22 @@ function investmentDecision(s){
     else if(peg<2) valuationScore=64;
     else if(peg<2.5) valuationScore=50;
     else valuationScore=35;
+  }else if(pe!=null&&pe>0){
+    if(pe<15) valuationScore=78;
+    else if(pe<22) valuationScore=70;
+    else if(pe<30) valuationScore=60;
+    else if(pe<45) valuationScore=48;
+    else valuationScore=32;
   }
   if(valuationScore!=null&&pe!=null&&pe>0&&industryPe>0){
     const rel=pe/industryPe;
-    let adjustment=0;
-    if(rel<.8) adjustment=7;
-    else if(rel<1) adjustment=-2;
-    else if(rel>1.5) adjustment=-10;
-    else if(rel>1.2) adjustment=-5;
+    const adjustment=rel<.8?7:rel<1?-2:rel>1.5?-10:rel>1.2?-5:0;
     valuationScore=clamp(valuationScore+adjustment);
   }
 
   const fairUpside=price>0&&fair>0?((fair/price)-1)*100:null;
   if(valuationScore!=null&&fairUpside!=null){
-    let adjustment=0;
-    if(fairUpside>=25) adjustment=10;
-    else if(fairUpside>=10) adjustment=6;
-    else if(fairUpside<=-25) adjustment=-12;
-    else if(fairUpside<0) adjustment=-6;
+    const adjustment=fairUpside>=25?10:fairUpside>=10?6:fairUpside<=-25?-12:fairUpside<0?-6:0;
     valuationScore=clamp(valuationScore+adjustment);
   }
 
@@ -115,7 +115,11 @@ function investmentDecision(s){
   const validParts=parts.filter(([,v])=>v!=null);
   const totalWeight=validParts.reduce((sum,[,,weight])=>sum+weight,0);
   const raw=totalWeight?validParts.reduce((sum,[,value,weight])=>sum+value*weight,0)/totalWeight:null;
-  const score=raw==null||available<3?null:clamp(raw*(.78+.22*coverage)-qualityPenalty);
+
+  // Missing forward data must materially limit the score. We never treat missing estimates as neutral.
+  const completenessPenalty=(hasForwardGrowth?0:10)+(hasForwardPE?0:8)+(beta==null?4:0)+(hasBenchmark?0:3);
+  const confidencePenalty=coverage<.625?12:coverage<.75?8:coverage<.875?4:0;
+  const score=raw==null||available<3?null:clamp(raw*(.70+.30*coverage)-qualityPenalty-completenessPenalty-confidencePenalty);
 
   const deterioration=clamp(100-(growth!=null&&growth<5?12:0)-(revenue!=null&&revenue<5?8:0)-(margin!=null&&margin<10?8:0)-(fcf!=null&&fcf<0?18:0));
   let label="ข้อมูลไม่ครบ";
@@ -126,16 +130,23 @@ function investmentDecision(s){
     else if(score>=43) label="ความเสี่ยงสูง";
     else label="ควรหลีกเลี่ยง";
   }
-  if(coverage<.875&&label==="น่าลงทุนมาก") label="น่าลงทุน";
+  // Hard safety caps: incomplete forward/risk data cannot produce an aggressive recommendation.
+  if(score!=null&&!hasForwardGrowth&&!hasForwardPE) label="รอจังหวะ";
+  else if(score!=null&&!hasForwardGrowth&&label==="น่าลงทุนมาก") label="น่าลงทุน";
+  if(score!=null&&beta==null&&label==="น่าลงทุนมาก") label="น่าลงทุน";
   if(coverage<.75&&score>=72) label="รอจังหวะ";
   if(deterioration<45) label="ควรหลีกเลี่ยง";
   if(fairUpside!=null&&fairUpside<-15&&label==="น่าลงทุนมาก") label="น่าลงทุน";
   if(fairUpside!=null&&fairUpside<-25&&score<82) label="รอจังหวะ";
 
   const warnings=[],positives=[];
-  if(quality!=="web_verified"&&quality!=="yahoo_finance2") warnings.push("ข้อมูลบางตัวมาจากฐานข้อมูลสำรอง");
+  if(!trusted) warnings.push(enriched?"ข้อมูลมาจาก Yahoo Timeseries/ข้อมูลอนุพันธ์ ยังไม่ใช่ชุดประมาณการครบ":"ข้อมูลบางตัวมาจากฐานข้อมูลสำรอง");
   if(beta==null) warnings.push("ยังไม่มี Beta ที่ยืนยันได้");
-  if(growthForecast==null&&growthHistorical!=null) warnings.push("Growth ใช้ข้อมูลย้อนหลัง เพราะยังไม่มีประมาณการล่วงหน้า");
+  if(!hasForwardGrowth&&growthHistorical!=null) warnings.push("ยังไม่มี Growth คาดการณ์ล่วงหน้า จึงใช้ Growth ย้อนหลัง");
+  if(!hasForwardPE&&trailingPe!=null) warnings.push("ยังไม่มี Forward P/E จึงใช้ Trailing P/E");
+  if(industryPe==null) warnings.push("ยังไม่มีค่า P/E ของอุตสาหกรรมสำหรับเทียบ");
+  if(fair==null) warnings.push("ยังไม่มี Fair Value ที่ตรวจสอบได้");
+  if(rawDebt!=null&&rawDebt<0) warnings.push("Debt/Equity ติดลบหรือมี denominator ผิดปกติ จึงไม่นำมาคะแนน");
   if(growth!=null&&growth<0) warnings.push("Growth ติดลบ");
   if(revenue!=null&&revenue<0) warnings.push("รายได้หดตัว");
   if(margin!=null&&margin<0) warnings.push("Margin ติดลบ");
@@ -151,9 +162,9 @@ function investmentDecision(s){
   if(roe!=null&&roe>=15) positives.push("ROE ดี");
   if(fairUpside!=null&&fairUpside>=15) positives.push("ราคาต่ำกว่า Fair Value Base");
 
-  const opportunity=score==null?null:clamp(score*.72+(fairUpside!=null?clamp(50+fairUpside*1.2)*.18:9)+(growth!=null&&growth>=15?10:0));
-  const confidence=coverage>=.875&&(quality==="web_verified"||quality==="yahoo_finance2")?"สูง":coverage>=.625?"กลาง":"ต่ำ";
-  return {score,label,industry:profile.name,business,financial,valuation:valuationScore,risk,deterioration,warnings,positives,confidence,coverage,opportunity,fairUpside,revision,growthBasis:growthForecast!=null?"forecast":"historical",peBasis};
+  const opportunity=score==null?null:clamp(score*.68+(fairUpside!=null?clamp(50+fairUpside*1.2)*.20:7)+(growth!=null&&growth>=15?10:0));
+  const confidence=trusted&&coverage>=.875&&hasForwardGrowth&&hasForwardPE&&beta!=null?"สูง":coverage>=.625?"กลาง":"ต่ำ";
+  return {score,label,industry:profile.name,business,financial,valuation:valuationScore,risk,deterioration,warnings,positives,confidence,coverage,opportunity,fairUpside,revision,growthBasis:hasForwardGrowth?"forecast":"historical",peBasis};
 }
 const extractAnalystTarget=(items,price)=>{
   for(const n of (items||[])){
