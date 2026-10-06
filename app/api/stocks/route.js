@@ -23,7 +23,7 @@ async function yahooEnrich(stocks){
         profit_margin:q?.profitMargins!=null?(Math.abs(q.profitMargins)<=2?q.profitMargins*100:q.profitMargins):s.profit_margin,
         free_cash_flow:q?.freeCashflow??s.free_cash_flow,
         debt_to_equity:q?.debtToEquity??s.debt_to_equity,
-        growth_next:(trend?.find(x=>x.period==="+1y")?.earningsEstimate?.growth?.raw??trend?.find(x=>x.period==="+1y")?.earningsEstimate?.growth??s.growth_next),
+        growth_next:(()=>{const v=trend?.find(x=>x.period==="+1y")?.earningsEstimate?.growth?.raw??trend?.find(x=>x.period==="+1y")?.earningsEstimate?.growth??s.growth_next;return v==null?null:(Math.abs(Number(v))<=2?Number(v)*100:Number(v))})(),
         eps_estimate_current:(trend?.find(x=>x.period==="0y")?.earningsEstimate?.avg?.raw??trend?.find(x=>x.period==="0y")?.earningsEstimate?.avg??q?.epsCurrentYear??s.eps_estimate_current),
         eps_estimate_next:(trend?.find(x=>x.period==="+1y")?.earningsEstimate?.avg?.raw??trend?.find(x=>x.period==="+1y")?.earningsEstimate?.avg??s.eps_estimate_next),
         earnings_revision_score:(()=>{const x=trend?.find(x=>x.period==="+1y")||trend?.find(x=>x.period==="0y");const a=x?.epsRevisions;const u7=a?.upLast7days?.raw??a?.upLast7days,d7=a?.downLast7days?.raw??a?.downLast7days,u30=a?.upLast30days?.raw??a?.upLast30days,d30=a?.downLast30days?.raw??a?.downLast30days;return [u7,d7,u30,d30].some(v=>v!=null)?Math.max(0,Math.min(100,50+(u7||0)*6-(d7||0)*8+(u30||0)*3-(d30||0)*4)):s.earnings_revision_score})()
