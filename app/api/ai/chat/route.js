@@ -4,7 +4,7 @@ export async function POST(req){
   const supabaseKey=process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
   if(!key||!supabaseUrl||!supabaseKey)return Response.json({error:"AI/Supabase environment variables are missing"},{status:500});
   try{
-    const {question}=await req.json();
+    const body=await req.json();\n    const question=typeof body?.question==="string"?body.question:typeof body?.message==="string"?body.message:"";
     if(!question||typeof question!=="string")return Response.json({error:"กรุณาระบุคำถาม"},{status:400});
     const headers={apikey:supabaseKey,Authorization:"Bearer "+supabaseKey};
     const base=supabaseUrl+"/rest/v1/";
