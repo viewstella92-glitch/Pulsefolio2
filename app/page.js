@@ -40,7 +40,7 @@ function investmentDecision(s){
   if(pe!=null&&pe>0&&growth!=null&&growth>0){const x=pe/growth;valuationScore=x<=.8?94:x<=1.1?88:x<=1.5?79:x<=2?66:x<=2.5?52:35}
   else if(peg!=null&&peg>0){valuationScore=peg<.8?92:peg<1.1?86:peg<1.5?77:peg<2?64:peg<2.5?50:35}
   if(valuationScore!=null&&pe!=null&&pe>0&&industryPe>0){const rel=pe/industryPe;valuationScore=clamp(valuationScore+(rel<.8?7:rel<1?-2:rel>1.5?-10:rel>1.2?-5:0))}
-  const fairUpside=price>0&&fair>0?((fair/price)-1)*100;
+  const fairUpside=price>0&&fair>0?((fair/price)-1)*100:null;
   if(valuationScore!=null&&fairUpside!=null)valuationScore=clamp(valuationScore+(fairUpside>=25?10:fairUpside>=10?6:fairUpside<=-25?-12:fairUpside<0?-6:0));
   let risk=null;
   if(beta!=null){risk=beta<=.9?82:beta<=1.2?75:beta<=1.5?67:beta<=2?56:42;if(growth!=null&&growth<0)risk-=18;if(revenue!=null&&revenue<0)risk-=14;if(margin!=null&&margin<0)risk-=20;if(fcf!=null&&fcf<0)risk-=16;if(!financialSector&&debt!=null&&debt>150)risk-=12;risk=clamp(risk)}
