@@ -168,7 +168,7 @@ const extractAnalystTarget=(items,price)=>{
 export default function Home(){
   const [stocks,setหุ้นs]=useState([]),[tab,setTab]=useState("home"),[selected,setSelected]=useState(null),[search,setSearch]=useState("");
   const [searchResults,setSearchResults]=useState([]),[searching,setSearching]=useState(false),[addingTicker,setAddingTicker]=useState("");
-  const [loading,setLoading]=useState(true),[error,setError]=useState(""),[ai,setAi]=useState(""),[aiLoading,setAiLoading]=useState(false),[watch,setWatch]=useState([]);
+  const [loading,setLoading]=useState(true),[error,setError]=useState(""),[ai,setAi]=useState(""),[aiLoading,setAiLoading]=useState(false),[watch,setWatch]=useState([]),[stateHydrated,setStateHydrated]=useState(false);
   const [quotes,setQuotes]=useState({}),[news,setข่าว]=useState([]),[earnings,setEarnings]=useState([]),[portfolio,setพอร์ตลงทุน]=useState({});
   const [changes,setChanges]=useState([]),[insights,setInsights]=useState({}),[lastUpdate,setLastUpdate]=useState(null),[brief,setBrief]=useState(""),[briefLoading,setBriefLoading]=useState(false),[syncLoading,setSyncLoading]=useState(false),[earnBrief,setEarnBrief]=useState(""),[earnLoading,setEarnLoading]=useState(false),[changeAI,setChangeAI]=useState({}),[changeAILoading,setChangeAILoading]=useState(""),[dailyBrief,setDailyBrief]=useState(null),[alerts,setAlerts]=useState([]),[chatOpen,setChatOpen]=useState(false),[chatInput,setChatInput]=useState(""),[chatMessages,setChatMessages]=useState([]),[chatLoading,setChatLoading]=useState(false);
   const [compareTickers,setCompareTickers]=useState([]);
@@ -184,12 +184,33 @@ export default function Home(){
       setข่าว(nd.news||[]);setEarnings(ed.earnings||[]);setChanges(cd.changes||[]);setInsights(id.insights||{});setLastUpdate(cd.lastUpdate||null);setDailyBrief((bd.briefings||[])[0]||null);setAlerts(ad.alerts||[]);
     }catch(e){setError(e?.message||"ไม่สามารถโหลดข้อมูลได้")}finally{setLoading(false)}
   };
-  useEffect(()=>{load();try{setWatch(JSON.parse(localStorage.getItem("pulse-watch")||"[]"));setพอร์ตลงทุน(JSON.parse(localStorage.getItem("pulse-portfolio")||"{}"))}catch{}},[]);
+  useEffect(()=>{
+  load();
+  (async()=>{
+    try{
+      const r=await fetch("/api/state",{cache:"no-store"}),d=await r.json();
+      if(r.ok&&d.state){
+        setWatch(Array.isArray(d.state.watchlist)?d.state.watchlist:[]);
+        setพอร์ตลงทุน(d.state.portfolio&&typeof d.state.portfolio==="object"?d.state.portfolio:{});
+      }else throw new Error("state load failed");
+    }catch{
+      try{
+        setWatch(JSON.parse(localStorage.getItem("pulse-watch")||"[]"));
+        setพอร์ตลงทุน(JSON.parse(localStorage.getItem("pulse-portfolio")||"{}"));
+      }catch{}
+    }finally{setStateHydrated(true)}
+  })();
+},[]);
   useEffect(()=>{if(stocks.length&&!compareTickers.length)setCompareTickers(stocks.slice(0,4).map(x=>x.ticker))},[stocks,compareTickers.length]);
   useEffect(()=>{if(!search.trim()||search.trim().length<2){setSearchResults([]);return}const t=setTimeout(async()=>{setSearching(true);try{const r=await fetch("/api/stocks/search?q="+encodeURIComponent(search.trim()),{cache:"no-store"});const d=await r.json();setSearchResults(d.results||[])}catch{setSearchResults([])}finally{setSearching(false)}},300);return()=>clearTimeout(t)},[search]);
   async function addStock(ticker){setAddingTicker(ticker);try{const r=await fetch("/api/stocks/search",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({ticker})});const d=await r.json();if(!r.ok)throw new Error(d.error||"เพิ่มหุ้นไม่สำเร็จ");setSearch("");setSearchResults([]);await load();setTab("rank")}catch(e){setError(e?.message||"เพิ่มหุ้นไม่สำเร็จ")}finally{setAddingTicker("")}}
-  useEffect(()=>localStorage.setItem("pulse-watch",JSON.stringify(watch)),[watch]);
-  useEffect(()=>localStorage.setItem("pulse-portfolio",JSON.stringify(portfolio)),[portfolio]);
+  useEffect(()=>{
+  if(!stateHydrated)return;
+  localStorage.setItem("pulse-watch",JSON.stringify(watch));
+  localStorage.setItem("pulse-portfolio",JSON.stringify(portfolio));
+  const t=setTimeout(()=>fetch("/api/state",{method:"PUT",headers:{"content-type":"application/json"},body:JSON.stringify({watchlist:watch,portfolio})}).catch(()=>{}),350);
+  return()=>clearTimeout(t);
+},[watch,portfolio,stateHydrated]);
   const merged=useMemo(()=>stocks.map(s=>({...s,...(quotes[s.ticker]||{}),db_price:s.price})),[stocks,quotes]);
   const decisions=useMemo(()=>merged.map(s=>({...s,investmentDecision:investmentDecision(s)})).sort((a,b)=>(b.investmentDecision.score??-1)-(a.investmentDecision.score??-1)),[merged]);
   const ranked=decisions;
