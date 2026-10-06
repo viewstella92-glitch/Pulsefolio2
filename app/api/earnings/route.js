@@ -42,7 +42,7 @@ async function calendar(tickers){
   const key=process.env.ALPHAVANTAGE_API_KEY;
   if(!key)return {rows:[],error:"ALPHAVANTAGE_API_KEY is not configured"};
   try{
-    const r=await fetch("https://www.alphavantage.co/query?function=EARNINGS_CALENDAR&horizon=3month"+(tickers.length===1?"&symbol="+encodeURIComponent(tickers[0]):"")+"&datatype=csv&apikey="+encodeURIComponent(key),{cache:"no-store",signal:AbortSignal.timeout(12000)});
+    const r=await fetch("https://www.alphavantage.co/query?function=EARNINGS_CALENDAR&horizon=3month&datatype=csv&apikey="+encodeURIComponent(key),{cache:"no-store",signal:AbortSignal.timeout(12000)});
     if(!r.ok)return {rows:[],error:"Alpha Vantage HTTP "+r.status};
     const text=await r.text();
     if(text.trim().startsWith("{")){
@@ -70,9 +70,7 @@ async function calendar(tickers){
   }catch(e){return {rows:[],error:e?.message||"Calendar request failed"}}
 }
 
-export async function GET(request){
-  const probe=new URL(request.url).searchParams.get("probe");
-  if(probe){const p=await alpha(probe.toUpperCase(),"EARNINGS"),calProbe=await calendar([probe.toUpperCase()]);return NextResponse.json({probe:probe.toUpperCase(),earningsOk:!!p.data,quarterlyCount:p.data?.quarterlyEarnings?.length||0,earningsError:p.error||null,calendarCount:calProbe.rows.length,calendarError:calProbe.error||null,calendarSample:calProbe.rows.slice(0,2)});}
+export async function GET(){
   const tickers=await getTickers(),stored=await getStored(),cal=await calendar(tickers);
   const rows=[],seen=new Set();
   for(const x of cal.rows){
