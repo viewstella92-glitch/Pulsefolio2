@@ -26,23 +26,56 @@ function metricScore(v,good,bad){
   return clamp(((bad-v)/(bad-good))*100);
 }
 function investmentDecision(s){
-  const profile=industryProfile(s),growth=num(s.growth_next),revenue=num(s.revenue_growth),margin=num(s.profit_margin),roe=num(s.roe),fcf=num(s.free_cash_flow),debt=num(s.debt_to_equity);
-  const pe=num(s.forward_pe),peg=num(s.peg),beta=num(s.beta),price=num(s.price),fair=num(s.fair_value_base),industryPe=num(s.industry_forward_pe);
-  const core={growth,revenue,margin,roe,fcf,debt,pe,peg},available=Object.values(core).filter(v=>v!=null).length,coverage=available/8,quality=s.data_quality||"unknown",qualityPenalty=quality==="web_verified"?0:quality==="quote_fallback"?6:3;
-  if(available<6)return {score:null,label:"ข้อมูลไม่ครบ",industry:profile.name,business:null,financial:null,valuation:null,risk:null,deterioration:null,warnings:["ต้องมีข้อมูลพื้นฐานอย่างน้อย 6 จาก 8 ตัวก่อนจัดอันดับ","ข้อมูลปัจจุบันยังไม่ควรใช้ตัดสินใจซื้อ"],positives:[],confidence:"ต่ำ",coverage,opportunity:null};
+  const profile=industryProfile(s);
+  const growthForecast=num(s.growth_next),growthHistorical=num(s.growth_current),growth=growthForecast??growthHistorical;
+  const revenue=num(s.revenue_growth),margin=num(s.profit_margin),roe=num(s.roe),fcf=num(s.free_cash_flow),debt=num(s.debt_to_equity);
+  const forwardPe=num(s.forward_pe),trailingPe=num(s.trailing_pe),pe=forwardPe??trailingPe,peBasis=forwardPe!=null?"Forward P/E":"Trailing P/E";
+  const peg=num(s.peg),beta=num(s.beta),price=num(s.price),fair=num(s.fair_value_base),industryPe=num(s.industry_forward_pe);
+  const core={growth,revenue,margin,roe,fcf,debt,pe,peg},available=Object.values(core).filter(v=>v!=null).length,coverage=available/8;
+  const quality=s.data_quality||"unknown",qualityPenalty=quality==="web_verified"||quality==="yahoo_finance2"?0:quality==="quote_fallback"?6:3;
   const growthScore=growth==null?null:clamp(50+growth*1.8),revenueScore=revenue==null?null:clamp(50+revenue*1.5),marginScore=margin==null?null:clamp(42+margin*1.8),roeScore=roe==null?null:clamp(50+roe*1.2),fcfScore=fcf==null?null:(fcf>0?72:22),financialSector=profile.name==="Financials",debtScore=debt==null?null:(financialSector?60:clamp(90-debt*.28));
   const weighted=parts=>{const valid=parts.filter(([,v])=>v!=null),total=valid.reduce((a,[,,w])=>a+w,0);return total?valid.reduce((a,[,v,w])=>a+v*w,0)/total:null};
   const business=weighted([["growth",growthScore,.42],["revenue",revenueScore,.28],["margin",marginScore,.30]]),financial=weighted([["margin",marginScore,.25],["roe",roeScore,.25],["fcf",fcfScore,.25],["debt",debtScore,.25]]);
-  let valuationScore=null;if(pe!=null&&pe>0&&growth!=null&&growth>0){const x=pe/growth;valuationScore=x<=.8?94:x<=1.1?88:x<=1.5?79:x<=2?66:x<=2.5?52:35}else if(peg!=null&&peg>0){valuationScore=peg<.8?92:peg<1.1?86:peg<1.5?77:peg<2?64:peg<2.5?50:35}
+  let valuationScore=null;
+  if(pe!=null&&pe>0&&growth!=null&&growth>0){const x=pe/growth;valuationScore=x<=.8?94:x<=1.1?88:x<=1.5?79:x<=2?66:x<=2.5?52:35}
+  else if(peg!=null&&peg>0){valuationScore=peg<.8?92:peg<1.1?86:peg<1.5?77:peg<2?64:peg<2.5?50:35}
   if(valuationScore!=null&&pe!=null&&pe>0&&industryPe>0){const rel=pe/industryPe;valuationScore=clamp(valuationScore+(rel<.8?7:rel<1?-2:rel>1.5?-10:rel>1.2?-5:0))}
-  const fairUpside=price>0&&fair>0?((fair/price)-1)*100:null;if(valuationScore!=null&&fairUpside!=null)valuationScore=clamp(valuationScore+(fairUpside>=25?10:fairUpside>=10?6:fairUpside<=-25?-12:fairUpside<0?-6:0));
-  let risk=null;if(beta!=null){risk=beta<=.9?82:beta<=1.2?75:beta<=1.5?67:beta<=2?56:42;if(growth!=null&&growth<0)risk-=18;if(revenue!=null&&revenue<0)risk-=14;if(margin!=null&&margin<0)risk-=20;if(fcf!=null&&fcf<0)risk-=16;if(!financialSector&&debt!=null&&debt>150)risk-=12;risk=clamp(risk)}
-  const news=num(s.news_score),revision=num(s.earnings_revision_score),parts=[["valuation",valuationScore,.30],["business",business,.27],["financial",financial,.25],["risk",risk,.10],["revision",revision,.05],["news",news==null?null:clamp(news),.03]],validParts=parts.filter(([,v])=>v!=null),totalWeight=validParts.reduce((a,[,,w])=>a+w,0),raw=totalWeight?validParts.reduce((a,[,v,w])=>a+v*w,0)/totalWeight:null,score=raw==null?null:clamp(raw*(.78+.22*coverage)-qualityPenalty);
-  const deterioration=clamp(100-(growth!=null&&growth<5?12:0)-(revenue!=null&&revenue<5?8:0)-(margin!=null&&margin<10?8:0)-(fcf!=null&&fcf<0?18:0));let label=score==null?"ข้อมูลไม่ครบ":score>=84?"น่าลงทุนมาก":score>=72?"น่าลงทุน":score>=57?"รอจังหวะ":score>=43?"ความเสี่ยงสูง":"ควรหลีกเลี่ยง";
-  if(coverage<.875&&label==="น่าลงทุนมาก")label="น่าลงทุน";if(coverage<.75&&score>=72)label="รอจังหวะ";if(deterioration<45)label="ควรหลีกเลี่ยง";if(fairUpside!=null&&fairUpside<-15&&label==="น่าลงทุนมาก")label="น่าลงทุน";if(fairUpside!=null&&fairUpside<-25&&score<82)label="รอจังหวะ";
-  const warnings=[],positives=[];if(quality!=="web_verified")warnings.push("ข้อมูลยังไม่ผ่านการยืนยันครบทุกตัวชี้วัด");if(beta==null)warnings.push("ยังไม่มี Beta ที่ยืนยันได้ จึงไม่นำความเสี่ยงมาเติมคะแนนแทน");if(growth!=null&&growth<0)warnings.push("กำไรคาดว่าจะหดตัว");if(revenue!=null&&revenue<0)warnings.push("รายได้หดตัว");if(margin!=null&&margin<0)warnings.push("Margin ติดลบ");if(fcf!=null&&fcf<0)warnings.push("Free Cash Flow ติดลบ");if(!financialSector&&debt!=null&&debt>150)warnings.push("หนี้สินต่อทุนสูง");if(pe!=null&&growth!=null&&growth>0&&pe/growth>2)warnings.push("Valuation สูงเมื่อเทียบกับ Growth");if(fairUpside!=null&&fairUpside<-10)warnings.push("ราคาสูงกว่า Fair Value Base");if(revision!=null&&revision<40)warnings.push("นักวิเคราะห์กำลังปรับประมาณการ EPS ลง");if(revision!=null&&revision>=65)positives.push("ประมาณการ EPS มีแรงปรับขึ้น");if(financialSector&&debt!=null)warnings.push("D/E ของ Financials ใช้เป็นตัวประกอบ ไม่ใช่ตัวตัดสินหลัก");if(growth!=null&&growth>=15)positives.push("Growth แข็งแรง");if(revenue!=null&&revenue>=10)positives.push("รายได้เติบโตดี");if(fcf!=null&&fcf>0)positives.push("สร้าง Free Cash Flow");if(roe!=null&&roe>=15)positives.push("ROE ดี");if(fairUpside!=null&&fairUpside>=15)positives.push("ราคาต่ำกว่า Fair Value Base");
-  const opportunity=score==null?null:clamp(score*.72+(fairUpside!=null?clamp(50+fairUpside*1.2)*.18:9)+(growth!=null&&growth>=15?10:0)),confidence=coverage>=.875&&quality==="web_verified"?"สูง":coverage>=.75?"กลาง":"ต่ำ";
-  return {score,label,industry:profile.name,business,financial,valuation:valuationScore,risk,deterioration,warnings,positives,confidence,coverage,opportunity,fairUpside,revision};
+  const fairUpside=price>0&&fair>0?((fair/price)-1)*100;
+  if(valuationScore!=null&&fairUpside!=null)valuationScore=clamp(valuationScore+(fairUpside>=25?10:fairUpside>=10?6:fairUpside<=-25?-12:fairUpside<0?-6:0));
+  let risk=null;
+  if(beta!=null){risk=beta<=.9?82:beta<=1.2?75:beta<=1.5?67:beta<=2?56:42;if(growth!=null&&growth<0)risk-=18;if(revenue!=null&&revenue<0)risk-=14;if(margin!=null&&margin<0)risk-=20;if(fcf!=null&&fcf<0)risk-=16;if(!financialSector&&debt!=null&&debt>150)risk-=12;risk=clamp(risk)}
+  const news=num(s.news_score),revision=num(s.earnings_revision_score);
+  const parts=[["valuation",valuationScore,.30],["business",business,.27],["financial",financial,.25],["risk",risk,.10],["revision",revision,.05],["news",news==null?null:clamp(news),.03]];
+  const validParts=parts.filter(([,v])=>v!=null),totalWeight=validParts.reduce((a,[,,w])=>a+w,0),raw=totalWeight?validParts.reduce((a,[,v,w])=>a+v*w,0)/totalWeight:null;
+  const score=raw==null||available<3?null:clamp(raw*(.78+.22*coverage)-qualityPenalty);
+  const deterioration=clamp(100-(growth!=null&&growth<5?12:0)-(revenue!=null&&revenue<5?8:0)-(margin!=null&&margin<10?8:0)-(fcf!=null&&fcf<0?18:0));
+  let label=score==null?"ข้อมูลไม่ครบ":score>=84?"น่าลงทุนมาก":score>=72?"น่าลงทุน":score>=57?"รอจังหวะ":score>=43?"ความเสี่ยงสูง":"ควรหลีกเลี่ยง";
+  if(coverage<.875&&label==="น่าลงทุนมาก")label="น่าลงทุน";
+  if(coverage<.75&&score>=72)label="รอจังหวะ";
+  if(deterioration<45)label="ควรหลีกเลี่ยง";
+  if(fairUpside!=null&&fairUpside<-15&&label==="น่าลงทุนมาก")label="น่าลงทุน";
+  if(fairUpside!=null&&fairUpside<-25&&score<82)label="รอจังหวะ";
+  const warnings=[],positives=[];
+  if(quality!=="web_verified"&&quality!=="yahoo_finance2")warnings.push("ข้อมูลบางตัวมาจากฐานข้อมูลสำรอง");
+  if(beta==null)warnings.push("ยังไม่มี Beta ที่ยืนยันได้");
+  if(growthForecast==null&&growthHistorical!=null)warnings.push("Growth ใช้ข้อมูลย้อนหลัง เพราะยังไม่มีประมาณการล่วงหน้า");
+  if(growth!=null&&growth<0)warnings.push("Growth ติดลบ");
+  if(revenue!=null&&revenue<0)warnings.push("รายได้หดตัว");
+  if(margin!=null&&margin<0)warnings.push("Margin ติดลบ");
+  if(fcf!=null&&fcf<0)warnings.push("Free Cash Flow ติดลบ");
+  if(!financialSector&&debt!=null&&debt>150)warnings.push("หนี้สินต่อทุนสูง");
+  if(pe!=null&&growth!=null&&growth>0&&pe/growth>2)warnings.push(`${peBasis} สูงเมื่อเทียบกับ Growth`);
+  if(fairUpside!=null&&fairUpside<-10)warnings.push("ราคาสูงกว่า Fair Value Base");
+  if(revision!=null&&revision<40)warnings.push("นักวิเคราะห์กำลังปรับประมาณการ EPS ลง");
+  if(revision!=null&&revision>=65)positives.push("ประมาณการ EPS มีแรงปรับขึ้น");
+  if(growth!=null&&growth>=15)positives.push("Growth แข็งแรง");
+  if(revenue!=null&&revenue>=10)positives.push("รายได้เติบโตดี");
+  if(fcf!=null&&fcf>0)positives.push("สร้าง Free Cash Flow");
+  if(roe!=null&&roe>=15)positives.push("ROE ดี");
+  if(fairUpside!=null&&fairUpside>=15)positives.push("ราคาต่ำกว่า Fair Value Base");
+  const opportunity=score==null?null:clamp(score*.72+(fairUpside!=null?clamp(50+fairUpside*1.2)*.18:9)+(growth!=null&&growth>=15?10:0));
+  const confidence=coverage>=.875&&(quality==="web_verified"||quality==="yahoo_finance2")?"สูง":coverage>=.625?"กลาง":"ต่ำ";
+  return {score,label,industry:profile.name,business,financial,valuation:valuationScore,risk,deterioration,warnings,positives,confidence,coverage,opportunity,fairUpside,revision,growthBasis:growthForecast!=null?"forecast":"historical",peBasis};
 }
 const extractAnalystTarget=(items,price)=>{
   for(const n of (items||[])){
