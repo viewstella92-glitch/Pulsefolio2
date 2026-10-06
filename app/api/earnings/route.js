@@ -1,6 +1,17 @@
 import { NextResponse } from "next/server";
 
-const TICKERS=["NVDA","CRM","CI","MU","ADBE","APP","INTU","NFLX","VRT","MELI","GRAB","ZTS","AZO","BLK","MA","AAPL","ARM","ALAB"];
+const FALLBACK_TICKERS=["NVDA","CRM","CI","MU","ADBE","APP","INTU","NFLX","VRT","MELI","GRAB","ZTS","AZO","BLK","MA","AAPL","ARM","ALAB"];
+async function getTickers(){
+  const url=process.env.NEXT_PUBLIC_SUPABASE_URL,key=process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+  if(!url||!key)return FALLBACK_TICKERS;
+  try{
+    const r=await fetch(url+"/rest/v1/stock_universe?select=ticker&active=eq.true",{headers:{apikey:key,Authorization:"Bearer "+key},cache:"no-store"});
+    if(!r.ok)return FALLBACK_TICKERS;
+    const rows=await r.json();
+    const tickers=rows.map(x=>x.ticker).filter(Boolean);
+    return tickers.length?tickers:FALLBACK_TICKERS;
+  }catch{return FALLBACK_TICKERS}
+}
 const UA="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126.0 Safari/537.36";
 
 async function getOne(ticker){
@@ -22,8 +33,8 @@ async function getOne(ticker){
       period:x?.period||null,
       epsEstimate:x?.earningsEstimate?.avg?.raw??null,
       revenueEstimate:x?.revenueEstimate?.avg?.raw??null,
-      epsGrowth:x?.earningsEstimate?.growth?.raw??x?.earningsEstimate?.growth?.fmt??null,
-      revenueGrowth:x?.revenueEstimate?.growth?.raw??x?.revenueEstimate?.growth?.fmt??null,
+      epsGrowth:(()=>{const v=x?.earningsEstimate?.growth?.raw??x?.earningsEstimate?.growth?.fmt;return v==null?null:(Math.abs(Number(v))<=2?Number(v)*100:Number(v))})(),
+      revenueGrowth:(()=>{const v=x?.revenueEstimate?.growth?.raw??x?.revenueEstimate?.growth?.fmt;return v==null?null:(Math.abs(Number(v))<=2?Number(v)*100:Number(v))})(),
       analystCount:x?.earningsEstimate?.numberOfAnalysts?.raw??null
     }));
     return {
