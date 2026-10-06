@@ -27,6 +27,17 @@ async function getYahoo(ticker){
   }catch{return null}
 }
 
+async function getEarningsToday(ticker){
+  try{
+    const r=await fetch("https://www.earningstoday.com/stocks/"+encodeURIComponent(ticker)+"/earnings-date",{headers:{"User-Agent":"Mozilla/5.0"},cache:"no-store"});
+    if(!r.ok)return null;
+    const html=await r.text();
+    const m=html.match(/dateTime\\?":\\?"(\\d{4}-\\d{2}-\\d{2})/);
+    if(!m)return null;
+    return {ticker,date:new Date(m[1]+"T00:00:00Z").toISOString(),estimated:true,history:[],trend:[],source:"EarningsToday"};
+  }catch{return null}
+}
+
 async function getStockAnalysis(ticker){
   try{
     const r=await fetch("https://stockanalysis.com/stocks/"+encodeURIComponent(ticker)+"/",{headers:{"User-Agent":"Mozilla/5.0"},cache:"no-store"});
@@ -44,7 +55,7 @@ async function getStockAnalysis(ticker){
 async function getOne(ticker){
   const y=await getYahoo(ticker);
   if(y&&(y.date||y.history.length||y.trend.length))return y;
-  return await getStockAnalysis(ticker);
+  return (await getEarningsToday(ticker)) || (await getStockAnalysis(ticker));
 }
 
 export async function GET(){
