@@ -11,58 +11,22 @@ async function getTickers(){
     return tickers.length?tickers:FALLBACK_TICKERS;
   }catch{return FALLBACK_TICKERS}
 }
-const UA="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126.0 Safari/537.36";
-const pct=v=>{const n=Number(v);return Number.isFinite(n)?Math.abs(n)<=2?n*100:n:null};
-
-async function getYahoo(ticker){
-  try{
-    const u="https://query2.finance.yahoo.com/v10/finance/quoteSummary/"+encodeURIComponent(ticker)+"?modules=calendarEvents,earningsHistory,earningsTrend&formatted=false&lang=en-US&region=US&corsDomain=finance.yahoo.com";
-    const r=await fetch(u,{headers:{"User-Agent":UA},next:{revalidate:1800}});
-    if(!r.ok)return null;
-    const q=(await r.json())?.quoteSummary?.result?.[0],e=q?.calendarEvents?.earnings;
-    const raw=e?.earningsDate?.[0]?.raw;
-    const history=(q?.earningsHistory?.history||[]).slice(0,8).map(x=>({date:x?.quarter?.raw?new Date(x.quarter.raw*1000).toISOString():null,epsActual:x?.epsActual?.raw??null,epsEstimate:x?.epsEstimate?.raw??null,surprisePercent:x?.surprisePercent?.raw!=null?pct(x.surprisePercent.raw):null})).filter(x=>x.date);
-    const trend=(q?.earningsTrend?.trend||[]).slice(0,5).map(x=>({period:x?.period||null,epsEstimate:x?.earningsEstimate?.avg?.raw??null,revenueEstimate:x?.revenueEstimate?.avg?.raw??null,epsGrowth:pct(x?.earningsEstimate?.growth?.raw??x?.earningsEstimate?.growth?.fmt),revenueGrowth:pct(x?.revenueEstimate?.growth?.raw??x?.revenueEstimate?.growth?.fmt),analystCount:x?.earningsEstimate?.numberOfAnalysts?.raw??null}));
-    return {ticker,date:raw?new Date(raw*1000).toISOString():null,estimated:Boolean(e?.isEarningsDateEstimate),epsAverage:e?.earningsAverage?.raw??null,revenueAverage:e?.revenueAverage?.raw??null,history,trend,source:"Yahoo Finance"};
-  }catch{return null}
-}
-
-async function getEarningsToday(ticker){
-  try{
-    const r=await fetch("https://www.earningstoday.com/stocks/"+encodeURIComponent(ticker)+"/earnings-date",{headers:{"User-Agent":UA},cache:"no-store"});
-    if(!r.ok)return null;
-    const html=await r.text();
-    const text=html.replace(/<[^>]+>/g," ").replace(/&nbsp;/g," ").replace(/&amp;/g,"&").replace(/\\s+/g," ").trim();
-    const m=text.match(/Next earnings report\\s+([A-Za-z]+\\s+\\d{1,2},\\s+\\d{4})/i);
-    if(!m)return null;
-    const date=new Date(m[1]);
-    if(Number.isNaN(date.getTime()))return null;
-    return {ticker,date:date.toISOString(),estimated:true,history:[],trend:[],source:"EarningsToday"};
-  }catch{return null}
-}
-
-async function getStockAnalysis(ticker){
-  try{
-    const r=await fetch("https://stockanalysis.com/stocks/"+encodeURIComponent(ticker)+"/",{headers:{"User-Agent":UA},cache:"no-store"});
-    if(!r.ok)return null;
-    const html=await r.text();
-    const text=html.replace(/<[^>]+>/g," ").replace(/&nbsp;/g," ").replace(/&amp;/g,"&").replace(/\\s+/g," ").trim();
-    const m=text.match(/Earnings Date\\s+([A-Za-z]+\\s+\\d{1,2},?\\s+\\d{4})/i);
-    if(!m)return null;
-    const date=new Date(m[1]);
-    if(Number.isNaN(date.getTime()))return null;
-    return {ticker,date:date.toISOString(),estimated:true,history:[],trend:[],source:"StockAnalysis / S&P Global"};
-  }catch{return null}
-}
-
-async function getOne(ticker){
-  const y=await getYahoo(ticker);
-  if(y&&(y.date||y.history.length||y.trend.length))return y;
-  return (await getEarningsToday(ticker)) || (await getStockAnalysis(ticker));
-}
 
 export async function GET(){
   const tickers=await getTickers();
-  const rows=(await Promise.all(tickers.map(getOne))).filter(Boolean).sort((a,b)=>{if(!a.date)return 1;if(!b.date)return -1;return new Date(a.date)-new Date(b.date)});
-  return NextResponse.json({earnings:rows,updatedAt:new Date().toISOString(),tickerCount:tickers.length,sourceCoverage:rows.reduce((m,x)=>(m[x.source]=(m[x.source]||0)+1,m),{})});
+  const url=process.env.NEXT_PUBLIC_SUPABASE_URL,key=process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+  if(!url||!key)return NextResponse.json({earnings:[],updatedAt:new Date().toISOString(),tickerCount:tickers.length,sourceCoverage:{}});
+  try{
+    const q=new URLSearchParams();
+    q.set("select","ticker,earnings_date,earnings_source,earnings_estimated");
+    q.set("ticker","in.("+tickers.join(",")+")");
+    q.set("earnings_date","not.is.null");
+    const r=await fetch(url+"/rest/v1/stock_fundamentals?"+q.toString(),{headers:{apikey:key,Authorization:"Bearer "+key},cache:"no-store"});
+    if(!r.ok)throw new Error("Earnings data unavailable");
+    const rows=await r.json();
+    const earnings=rows.map(x=>({ticker:x.ticker,date:x.earnings_date,estimated:x.earnings_estimated!==false,history:[],trend:[],source:x.earnings_source||"Stored earnings source"})).sort((a,b)=>new Date(a.date)-new Date(b.date));
+    return NextResponse.json({earnings,updatedAt:new Date().toISOString(),tickerCount:tickers.length,sourceCoverage:earnings.reduce((m,x)=>(m[x.source]=(m[x.source]||0)+1,m),{})});
+  }catch(e){
+    return NextResponse.json({earnings:[],updatedAt:new Date().toISOString(),tickerCount:tickers.length,sourceCoverage:{},error:e?.message||"Earnings data unavailable"},{status:200});
+  }
 }
