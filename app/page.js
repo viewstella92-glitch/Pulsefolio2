@@ -30,7 +30,7 @@ function investmentDecision(s){
   const growth=num(s.growth_next), revenue=num(s.revenue_growth), margin=num(s.profit_margin), roe=num(s.roe), fcf=num(s.free_cash_flow), debt=num(s.debt_to_equity), pe=num(s.forward_pe), peg=num(s.peg), beta=num(s.beta), newsScore=num(s.news_score)??50;
   const core=[growth,revenue,margin,roe,fcf,debt,pe,peg].filter(v=>v!=null).length;
   const coverage=core/8;
-  if(core<3) return {score:null,label:"ข้อมูลไม่ครบ",industry:profile.name,business:null,financial:null,valuation:null,risk:null,deterioration:null,warnings:["ข้อมูลพื้นฐานสำคัญยังไม่ครบ จึงยังไม่ควรจัดอันดับ"],positives:[],confidence:"ต่ำ",coverage};
+  if(core<5) return {score:null,label:"ข้อมูลไม่ครบ",industry:profile.name,business:null,financial:null,valuation:null,risk:null,deterioration:null,warnings:["ข้อมูลพื้นฐานสำคัญยังไม่ครบ จึงยังไม่ควรจัดอันดับ"],positives:[],confidence:"ต่ำ",coverage};
   const growthScore=growth==null?50:clamp(50+growth*1.5);
   const revenueScore=revenue==null?50:clamp(50+revenue*1.5);
   const marginScore=margin==null?50:clamp(50+margin*2.2);
@@ -44,11 +44,11 @@ function investmentDecision(s){
   const business=clamp((growthScore+revenueScore+marginScore)/3);
   const financial=clamp((marginScore+roeScore+fcfScore+debtScore)/4);
   const riskPenalty=(growth!=null&&growth<0?22:0)+(revenue!=null&&revenue<0?18:0)+(margin!=null&&margin<0?20:0)+(fcf!=null&&fcf<0?18:0)+(debt!=null&&debt>150?12:0)+(beta!=null&&beta>1.8?8:0);
-  const risk=clamp(100-riskPenalty);
-  const raw=valuationScore*.35+growthScore*.30+financial*.20+risk*.10+newsScore*.05;
+  const risk=beta==null?null:clamp(100-riskPenalty);
+  const raw=valuationScore*.35+growthScore*.30+financial*.20+(risk??50)*.10+newsScore*.05;
   const score=clamp(raw*(0.65+0.35*coverage));
   const deterioration=clamp(100-riskPenalty-(growth!=null&&growth<5?12:0));
-  let label=score>=80?"น่าลงทุนมาก":score>=68?"น่าลงทุน":score>=55?"รอจังหวะ":score>=42?"ความเสี่ยงสูง":"ควรหลีกเลี่ยง";
+  let label=score>=80?"น่าลงทุนมาก":score>=68?"น่าลงทุน":score>=55?"รอจังหวะ":score>=42?"ความเสี่ยงสูง":"ควรหลีกเลี่ยง";\n  if(coverage<0.75&&score>=68) label="รอจังหวะ";\n  if(beta==null) warnings.push("ยังไม่มี Beta ที่ยืนยันได้ จึงยังสรุปความเสี่ยงตลาดไม่ได้");
   if(deterioration<45) label="ควรหลีกเลี่ยง";
   const warnings=[];
   if(growth!=null&&growth<0) warnings.push("กำไรคาดว่าจะหดตัว");
@@ -250,7 +250,7 @@ function BusinessDecision({stock:s}){
  return <section className={"businessDecision "+(d.score>=68?"good":d.score<45?"bad":"wait")}>
   <div className="decisionTop"><div><span className="eyebrow">INVESTMENT DECISION</span><h3>สรุปว่าหุ้นนี้น่าลงทุนไหม?</h3></div><strong>{d.label}</strong></div>
   <div className="decisionScore"><span>Investment Score</span><b>{fmt(d.score,0)}</b><small>/ 100</small></div>
-  <div className="decisionGrid"><div><span>สุขภาพธุรกิจ</span><b>{fmt(d.business,0)}</b></div><div><span>ฐานะการเงิน</span><b>{fmt(d.financial,0)}</b></div><div><span>Valuation</span><b>{fmt(d.valuation,0)}</b></div><div><span>ความเสี่ยง</span><b>{fmt(d.risk,0)}</b></div></div>
+  <div className="decisionGrid"><div><span>สุขภาพธุรกิจ</span><b>{fmt(d.business,0)}</b></div><div><span>ฐานะการเงิน</span><b>{fmt(d.financial,0)}</b></div><div><span>Valuation</span><b>{fmt(d.valuation,0)}</b></div><div><span>ความเสี่ยง</span><b>{fmt(d.risk,0)}</b></div></div><div className="decisionConfidence">ความครบถ้วนของข้อมูล {fmt((d.coverage||0)*100,0)}% · ความมั่นใจ {d.confidence}</div>
   <div className="decisionWhy"><b>อุตสาหกรรม:</b> {d.industry}<br/><b>ปัจจัยบวก:</b> {d.positives.length?d.positives.join(" · "):"ยังไม่มีข้อมูลเพียงพอ"}{d.warnings.length?<><br/><b>สัญญาณเตือน:</b> {d.warnings.join(" · ")}</>:""}</div>
   <small>คะแนนนี้เป็นการคำนวณจากข้อมูลพื้นฐานที่มีอยู่จริงและ KPI ที่ปรับตามกลุ่มอุตสาหกรรม ไม่ใช่คำแนะนำซื้อขาย และจะถูกปรับเมื่อข้อมูลใหม่เข้ามา</small>
  </section>
