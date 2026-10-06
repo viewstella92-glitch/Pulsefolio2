@@ -29,50 +29,128 @@ function investmentDecision(s){
   const profile=industryProfile(s);
   const growthForecast=num(s.growth_next),growthHistorical=num(s.growth_current),growth=growthForecast??growthHistorical;
   const revenue=num(s.revenue_growth),margin=num(s.profit_margin),roe=num(s.roe),fcf=num(s.free_cash_flow),debt=num(s.debt_to_equity);
-  const forwardPe=num(s.forward_pe),trailingPe=num(s.trailing_pe),pe=forwardPe??trailingPe,peBasis=forwardPe!=null?"Forward P/E":"Trailing P/E";
+  const forwardPe=num(s.forward_pe),trailingPe=num(s.trailing_pe),pe=forwardPe??trailingPe;
+  const peBasis=forwardPe!=null?"Forward P/E":"Trailing P/E";
   const peg=num(s.peg),beta=num(s.beta),price=num(s.price),fair=num(s.fair_value_base),industryPe=num(s.industry_forward_pe);
-  const core={growth,revenue,margin,roe,fcf,debt,pe,peg},available=Object.values(core).filter(v=>v!=null).length,coverage=available/8;
-  const quality=s.data_quality||"unknown",qualityPenalty=quality==="web_verified"||quality==="yahoo_finance2"?0:quality==="quote_fallback"?6:3;
-  const growthScore=growth==null?null:clamp(50+growth*1.8),revenueScore=revenue==null?null:clamp(50+revenue*1.5),marginScore=margin==null?null:clamp(42+margin*1.8),roeScore=roe==null?null:clamp(50+roe*1.2),fcfScore=fcf==null?null:(fcf>0?72:22),financialSector=profile.name==="Financials",debtScore=debt==null?null:(financialSector?60:clamp(90-debt*.28));
-  const weighted=parts=>{const valid=parts.filter(([,v])=>v!=null),total=valid.reduce((a,[,,w])=>a+w,0);return total?valid.reduce((a,[,v,w])=>a+v*w,0)/total:null};
-  const business=weighted([["growth",growthScore,.42],["revenue",revenueScore,.28],["margin",marginScore,.30]]),financial=weighted([["margin",marginScore,.25],["roe",roeScore,.25],["fcf",fcfScore,.25],["debt",debtScore,.25]]);
+  const core={growth,revenue,margin,roe,fcf,debt,pe,peg};
+  const available=Object.values(core).filter(v=>v!=null).length;
+  const coverage=available/8;
+  const quality=s.data_quality||"unknown";
+  let qualityPenalty=3;
+  if(quality==="web_verified"||quality==="yahoo_finance2") qualityPenalty=0;
+  else if(quality==="quote_fallback") qualityPenalty=6;
+
+  const growthScore=growth==null?null:clamp(50+growth*1.8);
+  const revenueScore=revenue==null?null:clamp(50+revenue*1.5);
+  const marginScore=margin==null?null:clamp(42+margin*1.8);
+  const roeScore=roe==null?null:clamp(50+roe*1.2);
+  let fcfScore=null;
+  if(fcf!=null) fcfScore=fcf>0?72:22;
+  const financialSector=profile.name==="Financials";
+  let debtScore=null;
+  if(debt!=null) debtScore=financialSector?60:clamp(90-debt*.28);
+
+  const weighted=(items)=>{
+    const valid=items.filter(([,v])=>v!=null);
+    const total=valid.reduce((sum,[,,weight])=>sum+weight,0);
+    return total?valid.reduce((sum,[,value,weight])=>sum+value*weight,0)/total:null;
+  };
+  const business=weighted([["growth",growthScore,.42],["revenue",revenueScore,.28],["margin",marginScore,.30]]);
+  const financial=weighted([["margin",marginScore,.25],["roe",roeScore,.25],["fcf",fcfScore,.25],["debt",debtScore,.25]]);
+
   let valuationScore=null;
-  if(pe!=null&&pe>0&&growth!=null&&growth>0){const x=pe/growth;valuationScore=x<=.8?94:x<=1.1?88:x<=1.5?79:x<=2?66:x<=2.5?52:35}
-  else if(peg!=null&&peg>0){valuationScore=peg<.8?92:peg<1.1?86:peg<1.5?77:peg<2?64:peg<2.5?50:35}
-  if(valuationScore!=null&&pe!=null&&pe>0&&industryPe>0){const rel=pe/industryPe;valuationScore=clamp(valuationScore+(rel<.8?7:rel<1?-2:rel>1.5?-10:rel>1.2?-5:0))}
+  if(pe!=null&&pe>0&&growth!=null&&growth>0){
+    const x=pe/growth;
+    if(x<=.8) valuationScore=94;
+    else if(x<=1.1) valuationScore=88;
+    else if(x<=1.5) valuationScore=79;
+    else if(x<=2) valuationScore=66;
+    else if(x<=2.5) valuationScore=52;
+    else valuationScore=35;
+  }else if(peg!=null&&peg>0){
+    if(peg<.8) valuationScore=92;
+    else if(peg<1.1) valuationScore=86;
+    else if(peg<1.5) valuationScore=77;
+    else if(peg<2) valuationScore=64;
+    else if(peg<2.5) valuationScore=50;
+    else valuationScore=35;
+  }
+  if(valuationScore!=null&&pe!=null&&pe>0&&industryPe>0){
+    const rel=pe/industryPe;
+    let adjustment=0;
+    if(rel<.8) adjustment=7;
+    else if(rel<1) adjustment=-2;
+    else if(rel>1.5) adjustment=-10;
+    else if(rel>1.2) adjustment=-5;
+    valuationScore=clamp(valuationScore+adjustment);
+  }
+
   const fairUpside=price>0&&fair>0?((fair/price)-1)*100:null;
-  if(valuationScore!=null&&fairUpside!=null)valuationScore=clamp(valuationScore+(fairUpside>=25?10:fairUpside>=10?6:fairUpside<=-25?-12:fairUpside<0?-6:0));
+  if(valuationScore!=null&&fairUpside!=null){
+    let adjustment=0;
+    if(fairUpside>=25) adjustment=10;
+    else if(fairUpside>=10) adjustment=6;
+    else if(fairUpside<=-25) adjustment=-12;
+    else if(fairUpside<0) adjustment=-6;
+    valuationScore=clamp(valuationScore+adjustment);
+  }
+
   let risk=null;
-  if(beta!=null){risk=beta<=.9?82:beta<=1.2?75:beta<=1.5?67:beta<=2?56:42;if(growth!=null&&growth<0)risk-=18;if(revenue!=null&&revenue<0)risk-=14;if(margin!=null&&margin<0)risk-=20;if(fcf!=null&&fcf<0)risk-=16;if(!financialSector&&debt!=null&&debt>150)risk-=12;risk=clamp(risk)}
+  if(beta!=null){
+    if(beta<=.9) risk=82;
+    else if(beta<=1.2) risk=75;
+    else if(beta<=1.5) risk=67;
+    else if(beta<=2) risk=56;
+    else risk=42;
+    if(growth!=null&&growth<0) risk-=18;
+    if(revenue!=null&&revenue<0) risk-=14;
+    if(margin!=null&&margin<0) risk-=20;
+    if(fcf!=null&&fcf<0) risk-=16;
+    if(!financialSector&&debt!=null&&debt>150) risk-=12;
+    risk=clamp(risk);
+  }
+
   const news=num(s.news_score),revision=num(s.earnings_revision_score);
   const parts=[["valuation",valuationScore,.30],["business",business,.27],["financial",financial,.25],["risk",risk,.10],["revision",revision,.05],["news",news==null?null:clamp(news),.03]];
-  const validParts=parts.filter(([,v])=>v!=null),totalWeight=validParts.reduce((a,[,,w])=>a+w,0),raw=totalWeight?validParts.reduce((a,[,v,w])=>a+v*w,0)/totalWeight:null;
+  const validParts=parts.filter(([,v])=>v!=null);
+  const totalWeight=validParts.reduce((sum,[,,weight])=>sum+weight,0);
+  const raw=totalWeight?validParts.reduce((sum,[,value,weight])=>sum+value*weight,0)/totalWeight:null;
   const score=raw==null||available<3?null:clamp(raw*(.78+.22*coverage)-qualityPenalty);
+
   const deterioration=clamp(100-(growth!=null&&growth<5?12:0)-(revenue!=null&&revenue<5?8:0)-(margin!=null&&margin<10?8:0)-(fcf!=null&&fcf<0?18:0));
-  let label=score==null?"ข้อมูลไม่ครบ":score>=84?"น่าลงทุนมาก":score>=72?"น่าลงทุน":score>=57?"รอจังหวะ":score>=43?"ความเสี่ยงสูง":"ควรหลีกเลี่ยง";
-  if(coverage<.875&&label==="น่าลงทุนมาก")label="น่าลงทุน";
-  if(coverage<.75&&score>=72)label="รอจังหวะ";
-  if(deterioration<45)label="ควรหลีกเลี่ยง";
-  if(fairUpside!=null&&fairUpside<-15&&label==="น่าลงทุนมาก")label="น่าลงทุน";
-  if(fairUpside!=null&&fairUpside<-25&&score<82)label="รอจังหวะ";
+  let label="ข้อมูลไม่ครบ";
+  if(score!=null){
+    if(score>=84) label="น่าลงทุนมาก";
+    else if(score>=72) label="น่าลงทุน";
+    else if(score>=57) label="รอจังหวะ";
+    else if(score>=43) label="ความเสี่ยงสูง";
+    else label="ควรหลีกเลี่ยง";
+  }
+  if(coverage<.875&&label==="น่าลงทุนมาก") label="น่าลงทุน";
+  if(coverage<.75&&score>=72) label="รอจังหวะ";
+  if(deterioration<45) label="ควรหลีกเลี่ยง";
+  if(fairUpside!=null&&fairUpside<-15&&label==="น่าลงทุนมาก") label="น่าลงทุน";
+  if(fairUpside!=null&&fairUpside<-25&&score<82) label="รอจังหวะ";
+
   const warnings=[],positives=[];
-  if(quality!=="web_verified"&&quality!=="yahoo_finance2")warnings.push("ข้อมูลบางตัวมาจากฐานข้อมูลสำรอง");
-  if(beta==null)warnings.push("ยังไม่มี Beta ที่ยืนยันได้");
-  if(growthForecast==null&&growthHistorical!=null)warnings.push("Growth ใช้ข้อมูลย้อนหลัง เพราะยังไม่มีประมาณการล่วงหน้า");
-  if(growth!=null&&growth<0)warnings.push("Growth ติดลบ");
-  if(revenue!=null&&revenue<0)warnings.push("รายได้หดตัว");
-  if(margin!=null&&margin<0)warnings.push("Margin ติดลบ");
-  if(fcf!=null&&fcf<0)warnings.push("Free Cash Flow ติดลบ");
-  if(!financialSector&&debt!=null&&debt>150)warnings.push("หนี้สินต่อทุนสูง");
-  if(pe!=null&&growth!=null&&growth>0&&pe/growth>2)warnings.push(`${peBasis} สูงเมื่อเทียบกับ Growth`);
-  if(fairUpside!=null&&fairUpside<-10)warnings.push("ราคาสูงกว่า Fair Value Base");
-  if(revision!=null&&revision<40)warnings.push("นักวิเคราะห์กำลังปรับประมาณการ EPS ลง");
-  if(revision!=null&&revision>=65)positives.push("ประมาณการ EPS มีแรงปรับขึ้น");
-  if(growth!=null&&growth>=15)positives.push("Growth แข็งแรง");
-  if(revenue!=null&&revenue>=10)positives.push("รายได้เติบโตดี");
-  if(fcf!=null&&fcf>0)positives.push("สร้าง Free Cash Flow");
-  if(roe!=null&&roe>=15)positives.push("ROE ดี");
-  if(fairUpside!=null&&fairUpside>=15)positives.push("ราคาต่ำกว่า Fair Value Base");
+  if(quality!=="web_verified"&&quality!=="yahoo_finance2") warnings.push("ข้อมูลบางตัวมาจากฐานข้อมูลสำรอง");
+  if(beta==null) warnings.push("ยังไม่มี Beta ที่ยืนยันได้");
+  if(growthForecast==null&&growthHistorical!=null) warnings.push("Growth ใช้ข้อมูลย้อนหลัง เพราะยังไม่มีประมาณการล่วงหน้า");
+  if(growth!=null&&growth<0) warnings.push("Growth ติดลบ");
+  if(revenue!=null&&revenue<0) warnings.push("รายได้หดตัว");
+  if(margin!=null&&margin<0) warnings.push("Margin ติดลบ");
+  if(fcf!=null&&fcf<0) warnings.push("Free Cash Flow ติดลบ");
+  if(!financialSector&&debt!=null&&debt>150) warnings.push("หนี้สินต่อทุนสูง");
+  if(pe!=null&&growth!=null&&growth>0&&pe/growth>2) warnings.push(peBasis+" สูงเมื่อเทียบกับ Growth");
+  if(fairUpside!=null&&fairUpside<-10) warnings.push("ราคาสูงกว่า Fair Value Base");
+  if(revision!=null&&revision<40) warnings.push("นักวิเคราะห์กำลังปรับประมาณการ EPS ลง");
+  if(revision!=null&&revision>=65) positives.push("ประมาณการ EPS มีแรงปรับขึ้น");
+  if(growth!=null&&growth>=15) positives.push("Growth แข็งแรง");
+  if(revenue!=null&&revenue>=10) positives.push("รายได้เติบโตดี");
+  if(fcf!=null&&fcf>0) positives.push("สร้าง Free Cash Flow");
+  if(roe!=null&&roe>=15) positives.push("ROE ดี");
+  if(fairUpside!=null&&fairUpside>=15) positives.push("ราคาต่ำกว่า Fair Value Base");
+
   const opportunity=score==null?null:clamp(score*.72+(fairUpside!=null?clamp(50+fairUpside*1.2)*.18:9)+(growth!=null&&growth>=15?10:0));
   const confidence=coverage>=.875&&(quality==="web_verified"||quality==="yahoo_finance2")?"สูง":coverage>=.625?"กลาง":"ต่ำ";
   return {score,label,industry:profile.name,business,financial,valuation:valuationScore,risk,deterioration,warnings,positives,confidence,coverage,opportunity,fairUpside,revision,growthBasis:growthForecast!=null?"forecast":"historical",peBasis};
@@ -140,7 +218,7 @@ export default function Home(){
   async function syncNow(){setSyncLoading(true);try{await fetch("/api/cron/sync",{cache:"no-store"});await load()}finally{setSyncLoading(false)}}
   async function askBrief(){setBriefLoading(true);try{const r=await fetch("/api/ai/brief",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({stocks:ranked,changes,news})});const d=await r.json();setBrief(d.text||d.error||"AI ยังไม่ได้ส่งคำตอบ")}catch{setBrief("เชื่อมต่อ AI ไม่สำเร็จ")}finally{setBriefLoading(false)}}
   async function askAI(ticker){setAiLoading(true);setAi("");try{const r=await fetch("/api/ai",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({ticker,data:merged.find(s=>s.ticker===ticker),news:news.filter(n=>n.ticker===ticker).slice(0,8)})});const d=await r.json();setAi(d.text||d.error||"AI ยังไม่ได้เชื่อมต่อ")}catch{setAi("เชื่อมต่อ AI ไม่สำเร็จ")}finally{setAiLoading(false)}}
-  async function askChat(){const q=chatInput.trim();if(!q||chatLoading)return;setChatInput("");setChatMessages(m=>[...m,{role:"user",text:q}]);setChatLoading(true);try{const r=await fetch("/api/ai/chat",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({message:q})});const d=await r.json();setChatMessages(m=>[...m,{role:"assistant",text:d.text||d.error||"AI ยังไม่ตอบ"}]);}catch{setChatMessages(m=>[...m,{role:"assistant",text:"เชื่อมต่อ AI ไม่สำเร็จ"}]);}finally{setChatLoading(false)}}
+  async function askChat(){const q=chatInput.trim();if(!q||chatLoading)return;setChatInput("");setChatMessages(m=>[...m,{role:"user",text:q}]);setChatLoading(true);try{const r=await fetch("/api/ai/chat",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({question:q})});const d=await r.json();setChatMessages(m=>[...m,{role:"assistant",text:d.text||d.error||"AI ยังไม่ตอบ"}]);}catch{setChatMessages(m=>[...m,{role:"assistant",text:"เชื่อมต่อ AI ไม่สำเร็จ"}]);}finally{setChatLoading(false)}}
   async function explainChange(x){setChangeAILoading(x.ticker);try{const r=await fetch("/api/ai/change",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({ticker:x.ticker,current:x.current,previous:x.previous,earnings:earnings.find(e=>e.ticker===x.ticker)||null,news:news.filter(n=>n.ticker===x.ticker).slice(0,5)})});const d=await r.json();setChangeAI(v=>({...v,[x.ticker]:d.text||d.error||"AI ยังไม่ได้ส่งคำตอบ"}))}catch{setChangeAI(v=>({...v,[x.ticker]:"เชื่อมต่อ AI ไม่สำเร็จ"}))}finally{setChangeAILoading("")}}
   return <main className="app">
     <aside className="sidebar"><div className="brand"><div className="brandIcon">P</div><div><b>Pulsefolio</b><small>วิเคราะห์หุ้นสหรัฐฯ</small></div></div><nav>
