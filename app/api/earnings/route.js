@@ -80,15 +80,16 @@ export async function GET(){
   }
   for(const ticker of tickers){if(seen.has(ticker))continue;const x=stored.get(ticker);if(x?.earnings_date){rows.push({ticker,date:x.earnings_date,estimated:x.earnings_estimated!==false,epsEstimate:null,epsActual:null,surprise:null,surprisePct:null,history:[],trend:[],source:x.earnings_source||"Synced earnings source"});seen.add(ticker)}}
   const historyErrors={};
-  // History/estimates are fetched only for the first 6 active tickers per request to respect the free quota.
-  // Calendar remains one request and supplies all upcoming dates.
-  for(const item of rows.slice(0,6)){
+  // Fetch history/estimates for up to 6 rows. If the calendar provider returns no upcoming rows,
+  // use the latest reported earnings as a clearly-labeled fallback rather than returning an empty dashboard.
+  const historyTargets=rows.length?rows.slice(0,6):tickers.slice(0,6).map(t=>({ticker:t,date:null,estimated:false,epsEstimate:null,epsActual:null,surprise:null,surprisePct:null,history:[],trend:[],source:"Alpha Vantage Latest Reported Earnings"}));
+  for(const item of historyTargets){
     const [h,e]=await Promise.all([alpha(item.ticker,"EARNINGS"),alpha(item.ticker,"EARNINGS_ESTIMATES")]);
     if(h.data?.quarterlyEarnings?.length){
       const hist=h.data.quarterlyEarnings;
       item.history=hist.slice(0,8).map(q=>({fiscalDateEnding:q.fiscalDateEnding,reportedDate:q.reportedDate,reportedEPS:num(q.reportedEPS),estimatedEPS:num(q.estimatedEPS),surprise:num(q.surprise),surprisePercentage:num(q.surprisePercentage)}));
       const latest= item.history[0];
-      if(latest){item.epsActual=latest.reportedEPS;item.epsEstimate=latest.estimatedEPS??item.epsEstimate;item.surprise=latest.surprise;item.surprisePct=latest.surprisePercentage}
+      if(latest){item.epsActual=latest.reportedEPS;item.epsEstimate=latest.estimatedEPS??item.epsEstimate;item.surprise=latest.surprise;item.surprisePct=latest.surprisePercentage;if(!item.date&&latest.reportedDate){item.date=new Date(latest.reportedDate+"T00:00:00Z").toISOString();item.estimated=false}}
     }else if(h.error)historyErrors[item.ticker]=h.error;
     if(e.data?.estimates?.length)item.trend=e.data.estimates.slice(0,8).map(q=>({fiscalDateEnding:q.fiscalDateEnding,epsEstimate:num(q.epsEstimate),epsHigh:num(q.epsHigh),epsLow:num(q.epsLow),revenueEstimate:num(q.revenueEstimate),revenueHigh:num(q.revenueHigh),revenueLow:num(q.revenueLow),analystCount:num(q.numberOfAnalysts),revisionUp:num(q.epsRevisionsUp),revisionDown:num(q.epsRevisionsDown)}));
   }
