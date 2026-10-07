@@ -8,8 +8,8 @@ const num=v=>{const m=String(v??"").replace(/,/g,"").match(/-?\d+(?:\.\d+)?/);re
 async function getAnalyst(ticker){
   try{
     const [ov,fc]=await Promise.all([
-      fetch(SA+encodeURIComponent(ticker)+"/",{headers:{"User-Agent":"Mozilla/5.0"},cache:"no-store"}),
-      fetch(SA+encodeURIComponent(ticker)+"/forecast/",{headers:{"User-Agent":"Mozilla/5.0"},cache:"no-store"})
+      fetch("https://r.jina.ai/"+SA+encodeURIComponent(ticker)+"/",{headers:{"User-Agent":"Mozilla/5.0"},cache:"no-store"}),
+      fetch("https://r.jina.ai/"+SA+encodeURIComponent(ticker)+"/forecast/",{headers:{"User-Agent":"Mozilla/5.0"},cache:"no-store"})
     ]);
     if(!ov.ok||!fc.ok)return null;
     const ot=clean(await ov.text()),ft=clean(await fc.text());
