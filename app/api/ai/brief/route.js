@@ -1,4 +1,4 @@
-import { callGemini } from "../../lib/gemini";
+import { callGemini } from "../../../lib/gemini";
 
 export async function POST(req){
   const key=process.env.GEMINI_API_KEY;
