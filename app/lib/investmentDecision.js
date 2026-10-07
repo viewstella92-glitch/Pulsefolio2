@@ -12,11 +12,11 @@ function fairValueCheck(price,low,base,high){
 
 export function investmentDecision(s){
 const industry=profile(s);
-const growthF=n(s.growth_next),growthH=n(s.growth_current),revenue=n(s.revenue_growth),margin=n(s.profit_margin),roe=n(s.roe),fcf=n(s.free_cash_flow),debtRaw=n(s.debt_to_equity),debt=debtRaw!=null&&debtRaw>=0?debtRaw:null,beta=n(s.beta),peF=n(s.forward_pe),peT=n(s.trailing_pe),pe=peF??peT,industryPe=n(s.industry_forward_pe),price=n(s.price),low=n(s.fair_value_low),base=n(s.fair_value_base),high=n(s.fair_value_high),revision=n(s.earnings_revision_score),news=n(s.news_score),peg=n(s.peg);
+const growthF=n(s.growth_next),growthH=n(s.growth_current),revenue=n(s.revenue_growth),margin=n(s.profit_margin),roe=n(s.roe),fcf=n(s.free_cash_flow),marketCap=n(s.market_cap??s.marketCap??s.market_value??s.marketValue),debtRaw=n(s.debt_to_equity),debt=debtRaw!=null&&debtRaw>=0?debtRaw:null,beta=n(s.beta),peF=n(s.forward_pe),peT=n(s.trailing_pe),pe=peF??peT,industryPe=n(s.industry_forward_pe),price=n(s.price),low=n(s.fair_value_low),base=n(s.fair_value_base),high=n(s.fair_value_high),revision=n(s.earnings_revision_score),news=n(s.news_score),peg=n(s.peg);
 const growth=growthF??growthH,hasForwardGrowth=growthF!=null,hasForwardPE=peF!=null;
 const fv=fairValueCheck(price,low,base,high);
 const safeBase=fv.valid?base:null,safeLow=fv.valid?low:null,safeHigh=fv.valid?high:null;
-const growthScore=growth==null?null:clamp(50+growth*1.7),revenueScore=revenue==null?null:clamp(50+revenue*1.5),marginScore=margin==null?null:clamp(45+margin*1.7),roeScore=roe==null?null:clamp(50+roe*1.15),fcfScore=fcf==null?null:(fcf>0?78:18),debtScore=debt==null?null:(industry==="Financials"?62:clamp(92-debt*.30));
+const growthScore=growth==null?null:clamp(50+growth*1.7),revenueScore=revenue==null?null:clamp(50+revenue*1.5),marginScore=margin==null?null:clamp(45+margin*1.7),roeScore=roe==null?null:clamp(50+roe*1.15),fcfYield=fcf!=null&&marketCap>0?(fcf/marketCap)*100:null,fcfScore=fcfYield!=null?clamp(50+fcfYield*8):(fcf==null?null:(fcf>0?78:18)),debtScore=debt==null?null:(industry==="Financials"?62:clamp(92-debt*.30));
 const quality=weighted([["revenue",revenueScore,.22],["margin",marginScore,.22],["roe",roeScore,.22],["fcf",fcfScore,.22],["debt",debtScore,.12]]),growthScoreFinal=weighted([["eps",growthScore,.65],["revenue",revenueScore,.35]]);
 let valuation=null;
 if(pe!=null&&pe>0&&growth!=null&&growth>0){const ratio=pe/growth;valuation=ratio<=.8?95:ratio<=1.1?88:ratio<=1.5?78:ratio<=2?65:ratio<=2.5?50:34}else if(peg!=null&&peg>0){valuation=peg<.8?92:peg<1.1?85:peg<1.5?76:peg<2?63:peg<2.5?50:34}else if(pe!=null&&pe>0){valuation=pe<15?80:pe<22?70:pe<30?60:pe<45?47:30}
@@ -56,8 +56,8 @@ let label=score==null?"ข้อมูลไม่ครบ":score>=82?"น่�
 if(risk!=null&&risk<45)label="ควรหลีกเลี่ยง";
 if(growth!=null&&growth<0&&revenue!=null&&revenue<0)label="ควรหลีกเลี่ยง";
 if(fairUpside!=null&&fairUpside<-25)label="รอจังหวะ";
-const buyReady=score!=null&&confidence==="สูง"&&!blockedReasons.some(x=>["fair_value_conflict","high_risk","negative_growth","insufficient_data"].includes(x))&&["น่าลงทุนมาก","น่าลงทุน"].includes(label);
+const buyReady=score!=null&&["สูง","กลาง"].includes(confidence)&&!blockedReasons.some(x=>["fair_value_conflict","high_risk","negative_growth","insufficient_data"].includes(x))&&["น่าลงทุนมาก","น่าลงทุน"].includes(label);
 const dataQuality=Math.round(clamp(coverage*100-(blockedReasons.includes("fair_value_conflict")?12:0)-(blockedReasons.includes("insufficient_data")?8:0)));
 const opportunity=score==null?null:clamp(score*.75+(expectedReturn!=null?expectedReturn*.25:0));
-return {modelVersion:MODEL_VERSION,score,rawScore,label,industry,quality,business:quality,growth:growthScoreFinal,financial:quality,valuation,expectedReturn,risk,coverage,confidence,dataQuality,opportunity,fairUpside,bearReturn,baseReturn,bullReturn,revision,positives,warnings,blockedReasons,buyReady,growthBasis:hasForwardGrowth?"forecast":"historical",peBasis:hasForwardPE?"Forward P/E":"Trailing P/E",modifier:modifiers,fairValueStatus:fv.valid?"verified":"conflict",fairValueBaseUsed:safeBase};
+return {modelVersion:MODEL_VERSION,score,rawScore,label,industry,quality,business:quality,growth:growthScoreFinal,financial:quality,valuation,expectedReturn,risk,coverage,confidence,dataQuality,opportunity,fcfYield,fairUpside,bearReturn,baseReturn,bullReturn,revision,positives,warnings,blockedReasons,buyReady,growthBasis:hasForwardGrowth?"forecast":"historical",peBasis:hasForwardPE?"Forward P/E":"Trailing P/E",modifier:modifiers,fairValueStatus:fv.valid?"verified":"conflict",fairValueBaseUsed:safeBase};
 }
