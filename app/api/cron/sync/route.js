@@ -2,8 +2,8 @@ import { NextResponse } from "next/server";
 
 export const runtime="nodejs";
 const SA="https://stockanalysis.com/stocks/";
-const clean=html=>html.replace(/<[^>]+>/g," ").replace(/&nbsp;/g," ").replace(/&amp;/g,"&").replace(/\\s+/g," ").trim();
-const num=v=>{const m=String(v??"").replace(/,/g,"").match(/-?\\d+(?:\\.\\d+)?/);return m?Number(m[0]):null};
+const clean=html=>html.replace(/<[^>]+>/g," ").replace(/&nbsp;/g," ").replace(/&amp;/g,"&").replace(/\s+/g," ").trim();
+const num=v=>{const m=String(v??"").replace(/,/g,"").match(/-?\d+(?:\.\d+)?/);return m?Number(m[0]):null};
 
 async function getAnalyst(ticker){
   try{
@@ -13,10 +13,10 @@ async function getAnalyst(ticker){
     ]);
     if(!ov.ok||!fc.ok)return null;
     const ot=clean(await ov.text()),ft=clean(await fc.text());
-    const fm=ot.match(/Forward PE\\s+([\\d,.]+)/i);
-    const bm=ot.match(/Beta\\s+([\\d,.]+)/i);
-    const em=ft.match(/EPS Growth\\s+([\\d,.%-]+\\s+){0,8}/i);
-    const vals=em?(em[0].match(/-?\\d+(?:,\\d{3})*(?:\\.\\d+)?%/g)||[]).map(num):[];
+    const fm=ot.match(/Forward PE\s+([\d,.]+)/i);
+    const bm=ot.match(/Beta\s+([\d,.]+)/i);
+    const em=ft.match(/EPS Growth\s+([\d,.%-]+\s+){0,8}/i);
+    const vals=em?(em[0].match(/-?\d+(?:,\d{3})*(?:\.\d+)?%/g)||[]).map(num):[];
     const forward_pe=num(fm?.[1]),beta=num(bm?.[1]),growth_next=vals.length?vals[vals.length-1]:null;
     if(!(forward_pe>0)&&growth_next==null&&!(beta>0))return null;
     return {forward_pe:forward_pe>0?forward_pe:null,growth_next,beta:beta>0?beta:null,data_quality:"stockanalysis_enriched",data_source:"StockAnalysis / S&P Global + TipRanks"};
