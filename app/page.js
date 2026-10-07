@@ -26,7 +26,7 @@ function metricScore(v,good,bad){
   if(good>bad) return clamp(((v-bad)/(good-bad))*100);
   return clamp(((bad-v)/(bad-good))*100);
 }
-import { investmentDecision } from "./lib/investmentDecision";
+
 const extractAnalystTarget=(items,price)=>{
   for(const n of (items||[])){
     const text=`${n.title||""} ${n.summary||""}`;
