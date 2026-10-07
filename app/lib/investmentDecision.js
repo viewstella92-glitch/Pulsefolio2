@@ -13,7 +13,7 @@ if(valuation!=null&&industryPe!=null&&industryPe>0&&pe>0){const rel=pe/industryP
 const fairUpside=price>0&&base>0?((base/price)-1)*100:null;
 if(valuation!=null&&fairUpside!=null)valuation=clamp(valuation+(fairUpside>=25?10:fairUpside>=10?6:fairUpside<=-25?-12:fairUpside<0?-6:0));
 const expectedReturn=fairUpside!=null?clamp(50+fairUpside*1.15):null,bearReturn=price>0&&low>0?((low/price)-1)*100:null,baseReturn=fairUpside,bullReturn=price>0&&high>0?((high/price)-1)*100:null;
-let risk=beta==null?null:(beta<=.9?84:beta<=1.2?76:beta<=1.5?67:beta<=2?55:40);
+let risk=beta==null?60:(beta<=.9?84:beta<=1.2?76:beta<=1.5?67:beta<=2?55:40);
 if(risk!=null){if(growth!=null&&growth<0)risk-=18;if(revenue!=null&&revenue<0)risk-=14;if(margin!=null&&margin<0)risk-=20;if(fcf!=null&&fcf<0)risk-=15;if(debt!=null&&debt>150&&industry!=="Financials")risk-=12;risk=clamp(risk)}
 const modifiers=weighted([["revision",revision==null?null:clamp(revision),.6],["news",news==null?null:clamp(news),.4]]),parts=[[quality,.20],[growthScoreFinal,.25],[valuation,.25],[expectedReturn,.20],[risk,.10]],valid=parts.filter(([,v])=>v!=null);
 let score=valid.length?valid.reduce((a,[v])=>a+v,0)/valid.length:null;
