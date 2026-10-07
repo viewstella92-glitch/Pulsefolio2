@@ -55,7 +55,9 @@ async function yahooFallback(stock){
       if(num(out.profit_margin)==null&&latest.annualNetIncome!=null&&latest.annualTotalRevenue>0)out.profit_margin=(latest.annualNetIncome/latest.annualTotalRevenue)*100;
     }
   }catch{}
-  const est=await yahooEstimate(ticker);\n  for(const [k,v] of Object.entries(est))if(v!=null&&v!=="")out[k]=v;\n  out.data_sources=Array.from(new Set([...(Array.isArray(out.data_sources)?out.data_sources:[]),"Yahoo Finance fallback"]));
+  const est=await yahooEstimate(ticker);
+  for(const [k,v] of Object.entries(est))if(v!=null&&v!=="")out[k]=v;
+  out.data_sources=Array.from(new Set([...(Array.isArray(out.data_sources)?out.data_sources:[]),"Yahoo Finance fallback"]));
   out.data_quality_source="fallback_enriched";
   out.data_updated_at=new Date().toISOString();
   return out;
