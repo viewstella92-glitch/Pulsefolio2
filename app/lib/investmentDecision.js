@@ -43,5 +43,5 @@ if(fairUpside!=null&&fairUpside>=15)positives.push("ราคายังมี 
 if(revision!=null&&revision>=65)positives.push("ประมาณการ EPS มีแรงปรับขึ้น");
 if(revision!=null&&revision<40)warnings.push("ประมาณการ EPS ถูกปรับลง");
 const opportunity=score==null?null:clamp(score*.75+(expectedReturn!=null?expectedReturn*.25:0));
-return {score,label,industry,business:quality,growth:growthScoreFinal,valuation,expectedReturn,risk,coverage,confidence,opportunity,fairUpside,bearReturn,baseReturn,bullReturn,revision,positives,warnings,growthBasis:hasForwardGrowth?"forecast":"historical",peBasis:hasForwardPE?"Forward P/E":"Trailing P/E",modifier:modifiers};
+return {score,label,industry,quality,business:quality,growth:growthScoreFinal,financial:quality,valuation,expectedReturn,risk,coverage,confidence,opportunity,fairUpside,bearReturn,baseReturn,bullReturn,revision,positives,warnings,growthBasis:hasForwardGrowth?"forecast":"historical",peBasis:hasForwardPE?"Forward P/E":"Trailing P/E",modifier:modifiers};
 }
