@@ -219,6 +219,7 @@ body{background:radial-gradient(1000px 520px at 72% -10%,rgba(130,144,255,.14),t
 .home>section:nth-of-type(7){grid-column:1/7}
 .home>section:nth-of-type(8){grid-column:7/-1}
 .home>section:nth-of-type(9){grid-column:1/-1}
+.chatMsg{white-space:pre-wrap}
 .home>.section{margin-top:0;height:100%}
 .home>.section .newsList{max-height:440px;overflow:auto;padding-right:2px}
 .home>.section .changes{max-height:440px;overflow:auto}
