@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { callGemini } from "../../../../lib/gemini";
+import { callGemini } from "../../../lib/gemini";
 export async function POST(req){
  const key=process.env.GEMINI_API_KEY;
  if(!key)return NextResponse.json({error:"ยังไม่ได้ตั้งค่า GEMINI_API_KEY ใน Vercel"},{status:500});
