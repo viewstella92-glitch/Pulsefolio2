@@ -31,7 +31,7 @@ export async function POST(req){
 
     const [f,a,n,b,state]=await Promise.all([
       fetch(base+"stock_fundamentals?select=ticker,name,price,trailing_pe,forward_pe,peg,growth_current,growth_next,growth_long,revenue_growth,roe,profit_margin,free_cash_flow,debt_to_equity,beta,industry_forward_pe,fair_value_low,fair_value_base,fair_value_high,updated_at,data_source,data_quality,eps_estimate_current,eps_estimate_7d,eps_estimate_30d,eps_estimate_60d,eps_estimate_90d,earnings_revision_score",{headers,cache:"no-store"}),
-      fetch(base+"stock_analysis?select=ticker,valuation_score,growth_score,quality_score,risk_score,news_score,overall_score,buy_zone,explanation,updated_at",{headers,cache:"no-store"}),
+      fetch(base+"stock_analysis?select=ticker,valuation_score,growth_score,quality_score,risk_score,news_score,updated_at",{headers,cache:"no-store"}),
       fetch(base+"stock_news?select=ticker,title,source,summary,sentiment,category,impact_score,published_at&order=published_at.desc&limit=60",{headers,cache:"no-store"}),
       fetch(base+"daily_market_briefing?select=briefing_date,briefing_text,generated_at&order=briefing_date.desc&limit=3",{headers,cache:"no-store"}),
       fetch(base+"pulsefolio_state?id=eq.1&select=watchlist,portfolio",{headers,cache:"no-store"})
@@ -86,6 +86,7 @@ export async function POST(req){
 
     const prompt=`คุณคือ AI Analyst ของ Pulsefolio ตอบจากข้อมูลที่แนบเท่านั้น
 ห้ามสร้างตัวเลขหรือเติมข้อมูลที่ไม่มี ห้ามถือว่า null/— เป็นศูนย์
+ตัวเลขใน ANALYSIS เป็นคะแนนย่อยดิบ ไม่ใช่คะแนนรวมที่แสดงบนหน้าเว็บ ห้ามอ้างเป็นคะแนนรวม
 ถ้าข้อมูลสำคัญไม่พอให้บอกว่าไม่พอ
 ตอบภาษาไทย กระชับ มีเหตุผล และแยกข้อเท็จจริงจากการตีความ
 เมื่อพูดถึงตัวเลขให้ยึดข้อมูลล่าสุดที่แนบมา และระบุวันที่/แหล่งเมื่อมี
