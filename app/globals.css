@@ -249,3 +249,4 @@ body{background:radial-gradient(1000px 520px at 72% -10%,rgba(130,144,255,.14),t
 
 /* Portfolio concentration */
 .concentrationWarning{border-color:#6b5526;background:#201b10;color:#e9d29a}.allocationWrap{display:block;margin-top:7px;min-width:160px}.allocationBar{display:block;height:5px;border-radius:999px;background:#18273a;overflow:hidden}.allocationBar i{display:block;height:100%;background:var(--accent);border-radius:inherit}.allocationWrap small{margin-top:3px!important}
+.home .changes{grid-template-columns:1fr}
