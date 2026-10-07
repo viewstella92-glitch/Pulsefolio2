@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 export const runtime="nodejs";
-export const maxDuration=60;
+export const maxDuration=300;
 
 const SA="https://stockanalysis.com/stocks/";
 const SCRAPE_TIMEOUT_MS=8000;
