@@ -1,3 +1,5 @@
+export const maxDuration=60;
+
 const GEMINI_MODELS=[
   "gemini-3.8-flash",
   "gemini-3.7-flash",
@@ -7,9 +9,12 @@ const GEMINI_MODELS=[
   "gemini-3.1-flash-lite"
 ];
 
-async function callGemini(model,prompt,key){
+const BUDGET_MS=55000;     // เวลารวมทั้งหมด ต้องน้อยกว่า maxDuration
+const PER_MODEL_MS=20000;  // เวลาสูงสุดต่อโมเดล
+
+async function callGemini(model,prompt,key,timeoutMs){
   const controller=new AbortController();
-  const timer=setTimeout(()=>controller.abort(),30000);
+  const timer=setTimeout(()=>controller.abort(),timeoutMs);
   try{
     const r=await fetch("https://generativelanguage.googleapis.com/v1beta/interactions",{
       method:"POST",
@@ -37,8 +42,14 @@ export async function POST(req){
     const configured=(process.env.GEMINI_MODELS||"").split(",").map(x=>x.trim()).filter(Boolean);
     const models=[...new Set([...configured,...GEMINI_MODELS])];
     const attempts=[];
+    const deadline=Date.now()+BUDGET_MS;
     for(const model of models){
-      const result=await callGemini(model,prompt,key);
+      const remaining=deadline-Date.now();
+      if(remaining<3000){
+        attempts.push({model,status:null,reason:"skipped: time budget exhausted"});
+        break;
+      }
+      const result=await callGemini(model,prompt,key,Math.min(PER_MODEL_MS,remaining));
       attempts.push({model,status:result.status||null,reason:result.reason||null});
       if(result.ok) return Response.json({text:result.text,model:result.model,provider:"google-gemini",attempts});
       // 401/403 usually means the key/project cannot access the remaining models either.
