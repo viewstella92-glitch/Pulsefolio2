@@ -1,4 +1,4 @@
-import { callGemini } from "../../../lib/gemini";
+import { callGemini } from "../../lib/gemini";
 
 export const maxDuration=60;
 
