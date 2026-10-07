@@ -1,3 +1,6 @@
+import { callGemini } from "../../../lib/gemini";
+export const maxDuration=60;
+
 export async function POST(req){
   const key=process.env.GEMINI_API_KEY;
   const supabaseUrl=process.env.NEXT_PUBLIC_SUPABASE_URL;
