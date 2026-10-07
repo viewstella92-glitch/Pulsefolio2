@@ -9,6 +9,9 @@ const NUM_TYPES=[
 ];
 const TIMEOUT_MS=8000;
 
+const yahooFallbackCache=new Map();
+const YAHOO_FALLBACK_CACHE_MS=30*60*1000;
+
 const num=v=>v==null||v===""||!Number.isFinite(Number(v))?null:Number(v);
 
 // fetch ที่มี timeout กันคำขอค้าง
@@ -78,12 +81,21 @@ function markSupabase(stock){
 // เรียก Yahoo เฉพาะหุ้นที่ข้อมูลขาดจริง (needs(s) เป็น true) ที่เหลือใช้ข้อมูลจาก Supabase ตามเดิม
 async function fetchAllFallback(stocks,needs){
   const out=[];
+  let fallbackCount=0;
   for(let i=0;i<stocks.length;i+=6){
     const batch=stocks.slice(i,i+6);
-    const rows=await Promise.all(batch.map(s=>needs(s)?yahooFallback(s):markSupabase(s)));
-    out.push(...rows);
+    const rows=await Promise.all(batch.map(async s=>{
+      if(!needs(s))return {stock:markSupabase(s),usedFallback:false};
+      const ticker=s.ticker;
+      const cached=yahooFallbackCache.get(ticker);
+      if(cached&&Date.now()-cached.at<YAHOO_FALLBACK_CACHE_MS)return {stock:cached.data,usedFallback:false};
+      const data=await yahooFallback(s);
+      yahooFallbackCache.set(ticker,{data,at:Date.now()});
+      return {stock:data,usedFallback:true};
+    }));
+    for(const row of rows){out.push(row.stock);if(row.usedFallback)fallbackCount++;}
   }
-  return out;
+  return {stocks:out,fallbackCount};
 }
 
 export async function GET(){
@@ -118,8 +130,7 @@ export async function GET(){
     const aim=new Map(freshAI.map(x=>[x.ticker,x]));
     const initial=(universe||[]).map(x=>({...x,...(fm.get(x.ticker)||{}),...(am.get(x.ticker)||{}),...(aim.get(x.ticker)||{})}));
     const needsFallback=s=>["price","forward_pe","trailing_pe","peg","growth_next","profit_margin","roe","free_cash_flow","debt_to_equity"].some(k=>num(s[k])==null);
-    const stocks=await fetchAllFallback(initial,needsFallback);
-    const fallbackCount=stocks.filter(s=>s.data_quality_source==="fallback_enriched").length;
+    const {stocks,fallbackCount}=await fetchAllFallback(initial,needsFallback);
     return Response.json({stocks,meta:{universe:universe?.length||0,fundamentals:fundamentals?.length||0,analysis:analysis?.length||0,ai:freshAI.length,fallbackEnriched:fallbackCount},updatedAt:new Date().toISOString()});
   }catch(e){return Response.json({error:e?.message||"Stock API failed"},{status:500})}
 }
