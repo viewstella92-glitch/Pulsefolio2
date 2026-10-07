@@ -9,6 +9,17 @@ const NUM_TYPES=[
 
 const num=v=>v==null||v===""||!Number.isFinite(Number(v))?null:Number(v);
 
+async function yahooEstimate(ticker){
+  try{
+    const r=await fetch("https://query2.finance.yahoo.com/v1/finance/search?q="+encodeURIComponent(ticker)+"&quotesCount=10&newsCount=0",{headers:{"User-Agent":UA},cache:"no-store"});
+    if(!r.ok)return {};
+    const q=(await r.json())?.quotes?.find(x=>x.symbol===ticker&&x.quoteType==="EQUITY");
+    if(!q)return {};
+    const f=num(q.epsForward), cy=num(q.epsCurrentYear);
+    return {eps_forward:f,eps_estimate_current:cy,growth_next:f!=null&&cy!=null&&cy!==0?(f/cy-1)*100:null,earnings_estimate_source:"Yahoo Finance quote"};
+  }catch{return {}}
+}
+
 async function yahooFallback(stock){
   const ticker=stock.ticker;
   const out={...stock};
@@ -44,7 +55,7 @@ async function yahooFallback(stock){
       if(num(out.profit_margin)==null&&latest.annualNetIncome!=null&&latest.annualTotalRevenue>0)out.profit_margin=(latest.annualNetIncome/latest.annualTotalRevenue)*100;
     }
   }catch{}
-  out.data_sources=Array.from(new Set([...(Array.isArray(out.data_sources)?out.data_sources:[]),"Yahoo Finance fallback"]));
+  const est=await yahooEstimate(ticker);\n  for(const [k,v] of Object.entries(est))if(v!=null&&v!=="")out[k]=v;\n  out.data_sources=Array.from(new Set([...(Array.isArray(out.data_sources)?out.data_sources:[]),"Yahoo Finance fallback"]));
   out.data_quality_source="fallback_enriched";
   out.data_updated_at=new Date().toISOString();
   return out;
