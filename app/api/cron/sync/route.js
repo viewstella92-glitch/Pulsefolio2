@@ -15,7 +15,7 @@ async function getAnalyst(ticker){
     const ot=clean(await ov.text()),ft=clean(await fc.text());
     const fm=ot.match(/Forward PE\s+([\d,.]+)/i);
     const bm=ot.match(/Beta\s+([\d,.]+)/i);
-    const em=ft.match(/EPS Growth\s+([\d,.%-]+\s+){0,8}/i);
+    const em=ft.match(/EPS Growth\s+([\d,.%-]+(?:\s+[-\d,.%]+){0,8})/i);
     const vals=em?(em[0].match(/-?\d+(?:,\d{3})*(?:\.\d+)?%/g)||[]).map(num):[];
     const forward_pe=num(fm?.[1]),beta=num(bm?.[1]),growth_next=vals.length?vals[vals.length-1]:null;
     if(!(forward_pe>0)&&growth_next==null&&!(beta>0))return null;
@@ -31,28 +31,41 @@ async function getTickers(base,headers){
   return ["NVDA","CRM","CI","MU","ADBE","APP","INTU","NFLX","VRT","MELI","GRAB","ZTS","AZO","BLK","MA","AAPL","ARM","ALAB","LEU","NVO","AVGO"];
 }
 
+async function runSync(req,{manual=false}={}){
+  const supabase=process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key=process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+  if(!supabase||!key)return NextResponse.json({error:"Supabase environment variables are missing"},{status:500});
+  const base=supabase+"/rest/v1/";
+  const headers={apikey:key,Authorization:"Bearer "+key};
+  const tickers=await getTickers(base,headers);
+  const seed={};
+  for(let i=0;i<tickers.length;i+=5){
+    const batch=tickers.slice(i,i+5);
+    const rows=await Promise.all(batch.map(async ticker=>[ticker,await getAnalyst(ticker)]));
+    for(const [ticker,data] of rows)if(data)seed[ticker]=data;
+  }
+  const functions=process.env.SUPABASE_FUNCTIONS_URL||(supabase.endsWith("/")?supabase.slice(0,-1):supabase)+"/functions/v1";
+  const r=await fetch(functions+"/pulse-sync",{method:"POST",headers:{"Content-Type":"application/json",...headers},body:JSON.stringify({tickers,seed}),cache:"no-store"});
+  const data=await r.json().catch(()=>({}));
+  const e=await fetch(functions+"/estimate-sync",{method:"POST",headers,cache:"no-store"});
+  const estimates=await e.json().catch(()=>({}));
+  return NextResponse.json({...data,analystSeeded:Object.keys(seed).length,tickers:tickers.length,estimates,mode:manual?"manual":"cron"},{status:r.ok&&e.ok?200:207});
+}
+
 export async function GET(req){
   const secret=process.env.CRON_SECRET;
   const auth=req.headers.get("authorization")||"";
   if(secret&&auth!=="Bearer "+secret)return NextResponse.json({error:"Unauthorized"},{status:401});
-  try{
-    const supabase=process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const key=process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
-    if(!supabase||!key)return NextResponse.json({error:"Supabase environment variables are missing"},{status:500});
-    const base=supabase+"/rest/v1/";
-    const headers={apikey:key,Authorization:"Bearer "+key};
-    const tickers=await getTickers(base,headers);
-    const seed={};
-    for(let i=0;i<tickers.length;i+=5){
-      const batch=tickers.slice(i,i+5);
-      const rows=await Promise.all(batch.map(async ticker=>[ticker,await getAnalyst(ticker)]));
-      for(const [ticker,data] of rows)if(data)seed[ticker]=data;
-    }
-    const functions=process.env.SUPABASE_FUNCTIONS_URL||(supabase.endsWith("/")?supabase.slice(0,-1):supabase)+"/functions/v1";
-    const r=await fetch(functions+"/pulse-sync",{method:"POST",headers:{"Content-Type":"application/json",...headers},body:JSON.stringify({tickers,seed}),cache:"no-store"});
-    const data=await r.json().catch(()=>({}));
-    const e=await fetch(functions+"/estimate-sync",{method:"POST",headers,cache:"no-store"});
-    const estimates=await e.json().catch(()=>({}));
-    return NextResponse.json({...data,analystSeeded:Object.keys(seed).length,tickers:tickers.length,estimates},{status:r.ok&&e.ok?200:207});
-  }catch(e){return NextResponse.json({error:e?.message||"Sync failed"},{status:500})}
+  try{return await runSync(req,{manual:false});}
+  catch(e){return NextResponse.json({error:e?.message||"Sync failed"},{status:500})}
+}
+
+export async function POST(req){
+  const secret=process.env.MANUAL_SYNC_SECRET||process.env.CRON_SECRET;
+  if(secret){
+    const auth=req.headers.get("authorization")||"";
+    if(auth!=="Bearer "+secret)return NextResponse.json({error:"Unauthorized"},{status:401});
+  }
+  try{return await runSync(req,{manual:true});}
+  catch(e){return NextResponse.json({error:e?.message||"Manual sync failed"},{status:500})}
 }
