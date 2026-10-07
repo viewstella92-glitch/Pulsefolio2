@@ -117,7 +117,7 @@ export async function GET(){
     });
     const aim=new Map(freshAI.map(x=>[x.ticker,x]));
     const initial=(universe||[]).map(x=>({...x,...(fm.get(x.ticker)||{}),...(am.get(x.ticker)||{}),...(aim.get(x.ticker)||{})}));
-    const needsFallback=s=>["price","forward_pe","trailing_pe","peg","beta","growth_next","revenue_growth","profit_margin","roe","free_cash_flow","debt_to_equity"].some(k=>num(s[k])==null);
+    const needsFallback=s=>["price","forward_pe","trailing_pe","peg","growth_next","profit_margin","roe","free_cash_flow","debt_to_equity"].some(k=>num(s[k])==null);
     const stocks=await fetchAllFallback(initial,needsFallback);
     const fallbackCount=stocks.filter(s=>s.data_quality_source==="fallback_enriched").length;
     return Response.json({stocks,meta:{universe:universe?.length||0,fundamentals:fundamentals?.length||0,analysis:analysis?.length||0,ai:freshAI.length,fallbackEnriched:fallbackCount},updatedAt:new Date().toISOString()});
