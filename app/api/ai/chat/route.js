@@ -51,13 +51,19 @@ export async function POST(req){
         .map(x=>String(x.ticker||"").trim().toUpperCase())
         .filter(Boolean)
     );
-    const tickerMatches=[...question.toUpperCase().matchAll(/\$?([A-Z]{1,5}(?:[.-][A-Z]{1,3})?)/g)]
-      .map(m=>m[1])
-      .filter(t=>knownTickers.has(t));
+    const tickerMatches=[...question.matchAll(/(?<![A-Za-z])\$?([A-Z]{1,5}(?:[.-][A-Z]{1,3})?)(?![A-Za-z])/g)].map(m=>m[1]).filter(t=>knownTickers.has(t));
     const tickers=[...new Set(tickerMatches)];
 
-    const filterByTicker=(rows)=>tickers.length
-      ? (rows||[]).filter(x=>tickers.includes(String(x.ticker||"").toUpperCase()))
+    const stateRow=stateRows?.[0]||{watchlist:[],portfolio:{}};
+    const portfolioState={
+      watchlist:Array.isArray(stateRow.watchlist)?stateRow.watchlist:[],
+      portfolio:stateRow.portfolio&&typeof stateRow.portfolio==="object"?stateRow.portfolio:{}
+    };
+    const mine=[...new Set([...Object.keys(portfolioState.portfolio),...portfolioState.watchlist])].map(x=>String(x).toUpperCase());
+    const wantsMine=/พอร์ต|ถืออยู่|ติดตาม|portfolio|watchlist/i.test(question);
+    const scope=tickers.length?tickers:(wantsMine&&mine.length?mine:[]);
+    const filterByTicker=(rows)=>scope.length
+      ? (rows||[]).filter(x=>scope.includes(String(x.ticker||"").toUpperCase()))
       : (rows||[]);
 
     const filteredFundamentals=filterByTicker(fundamentals);
@@ -67,19 +73,13 @@ export async function POST(req){
       summary:String(x.summary||"").slice(0,200)
     }));
 
-    const stateRow=stateRows?.[0]||{watchlist:[],portfolio:{}};
-    const portfolioState={
-      watchlist:Array.isArray(stateRow.watchlist)?stateRow.watchlist:[],
-      portfolio:stateRow.portfolio&&typeof stateRow.portfolio==="object"?stateRow.portfolio:{}
-    };
-
     const historyText=history.length
       ? history.map(x=>`${x.role==="assistant"?"AI":"ผู้ใช้"}: ${x.text}`).join("\n")
       : "ไม่มีประวัติบทสนทนา";
 
-    const scopeText=tickers.length
-      ? `พบ ticker ที่รู้จักในคำถาม: ${tickers.join(", ")} จึงใช้ Fundamentals / Analysis / News เฉพาะหุ้นเหล่านี้`
-      : "ไม่พบ ticker ที่ตรงกับหุ้นในฐานข้อมูล จึงใช้ข้อมูลหุ้นทั้งหมดที่มี";
+    const scopeText=scope.length
+      ? `ใช้ Fundamentals / Analysis / News เฉพาะหุ้นในขอบเขตนี้: ${scope.join(", ")}`
+      : "ไม่พบ ticker หรือขอบเขตพอร์ต/รายการติดตามที่ตรงกับข้อมูล จึงใช้ข้อมูลหุ้นทั้งหมดที่มี";
 
     const prompt=`คุณคือ AI Analyst ของ Pulsefolio ตอบจากข้อมูลที่แนบเท่านั้น
 ห้ามสร้างตัวเลขหรือเติมข้อมูลที่ไม่มี ห้ามถือว่า null/— เป็นศูนย์
@@ -112,30 +112,9 @@ ${JSON.stringify(filteredNews)}
 DAILY MARKET BRIEF:
 ${JSON.stringify(briefings||[])}`;
 
-    const controller=new AbortController();
-    const timer=setTimeout(()=>controller.abort(),30000);
-    try{
-      const response=await fetch("https://generativelanguage.googleapis.com/v1beta/interactions",{
-        method:"POST",
-        headers:{"Content-Type":"application/json","x-goog-api-key":key},
-        body:JSON.stringify({
-          model:"gemini-3.8-flash",
-          input:prompt
-        }),
-        signal:controller.signal
-      });
-      const data=await response.json().catch(()=>({}));
-      if(!response.ok){
-        return Response.json({error:data.error?.message||`Gemini API error: ${response.status}`},{status:502});
-      }
-      const text=data.output_text
-        ||data.steps?.flatMap(s=>s.content||[]).filter(c=>c.type==="text").map(c=>c.text||"").join("")
-        ||"";
-      if(!text)return Response.json({error:"AI ไม่ได้ส่งข้อความกลับมา"},{status:502});
-      return Response.json({text});
-    }finally{
-      clearTimeout(timer);
-    }
+    const result=await callGemini(prompt,key,{budgetMs:55000,perModelMs:20000});
+    if(!result.ok)return Response.json({error:result.reason,details:result.attempts},{status:502});
+    return Response.json({text:result.text,model:result.model,attempts:result.attempts});
   }catch(e){
     return Response.json({error:e?.message||"AI chat failed"},{status:500});
   }
