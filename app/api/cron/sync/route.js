@@ -1,15 +1,19 @@
 import { NextResponse } from "next/server";
 
 export const runtime="nodejs";
+export const maxDuration=60;
+
 const SA="https://stockanalysis.com/stocks/";
+const SCRAPE_TIMEOUT_MS=8000;
 const clean=html=>html.replace(/<[^>]+>/g," ").replace(/&nbsp;/g," ").replace(/&amp;/g,"&").replace(/\s+/g," ").trim();
 const num=v=>{const m=String(v??"").replace(/,/g,"").match(/-?\d+(?:\.\d+)?/);return m?Number(m[0]):null};
+const tfetch=(u,o={},ms=SCRAPE_TIMEOUT_MS)=>fetch(u,{...o,signal:AbortSignal.timeout(ms)});
 
 async function getAnalyst(ticker){
   try{
     const [ov,fc]=await Promise.all([
-      fetch("https://r.jina.ai/"+SA+encodeURIComponent(ticker)+"/",{headers:{"User-Agent":"Mozilla/5.0"},cache:"no-store"}),
-      fetch("https://r.jina.ai/"+SA+encodeURIComponent(ticker)+"/forecast/",{headers:{"User-Agent":"Mozilla/5.0"},cache:"no-store"})
+      tfetch("https://r.jina.ai/"+SA+encodeURIComponent(ticker)+"/",{headers:{"User-Agent":"Mozilla/5.0"},cache:"no-store"}),
+      tfetch("https://r.jina.ai/"+SA+encodeURIComponent(ticker)+"/forecast/",{headers:{"User-Agent":"Mozilla/5.0"},cache:"no-store"})
     ]);
     if(!ov.ok||!fc.ok)return null;
     const ot=clean(await ov.text()),ft=clean(await fc.text());
@@ -25,7 +29,7 @@ async function getAnalyst(ticker){
 
 async function getTickers(base,headers){
   try{
-    const r=await fetch(base+"stock_universe?select=ticker&active=eq.true",{headers,cache:"no-store"});
+    const r=await tfetch(base+"stock_universe?select=ticker&active=eq.true",{headers,cache:"no-store"});
     if(r.ok){const rows=await r.json();const xs=rows.map(x=>String(x.ticker||"").trim().toUpperCase()).filter(Boolean);if(xs.length)return xs}
   }catch{}
   return ["NVDA","CRM","CI","MU","ADBE","APP","INTU","NFLX","VRT","MELI","GRAB","ZTS","AZO","BLK","MA","AAPL","ARM","ALAB","LEU","NVO","AVGO"];
@@ -47,9 +51,18 @@ async function runSync(req,{manual=false}={}){
   const functions=process.env.SUPABASE_FUNCTIONS_URL||(supabase.endsWith("/")?supabase.slice(0,-1):supabase)+"/functions/v1";
   const r=await fetch(functions+"/pulse-sync",{method:"POST",headers:{"Content-Type":"application/json",...headers},body:JSON.stringify({tickers,seed}),cache:"no-store"});
   const data=await r.json().catch(()=>({}));
-  const e=await fetch(functions+"/estimate-sync",{method:"POST",headers,cache:"no-store"});
-  const estimates=await e.json().catch(()=>({}));
-  return NextResponse.json({...data,analystSeeded:Object.keys(seed).length,tickers:tickers.length,estimates,mode:manual?"manual":"cron"},{status:r.ok&&e.ok?200:207});
+
+  // ถ้า estimate-sync ล้ม ต้องไม่ทำให้ทั้ง route ตอบ 500 ทั้งที่ pulse-sync สำเร็จไปแล้ว
+  let estimates={},estimatesOk=false;
+  try{
+    const e=await fetch(functions+"/estimate-sync",{method:"POST",headers,cache:"no-store"});
+    estimates=await e.json().catch(()=>({}));
+    estimatesOk=e.ok;
+  }catch(err){
+    estimates={error:err?.message||"estimate-sync failed"};
+  }
+
+  return NextResponse.json({...data,analystSeeded:Object.keys(seed).length,tickers:tickers.length,estimates,mode:manual?"manual":"cron"},{status:r.ok&&estimatesOk?200:207});
 }
 
 export async function GET(req){
