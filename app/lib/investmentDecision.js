@@ -22,16 +22,16 @@ let valuation=null;
 if(pe!=null&&pe>0&&growth!=null&&growth>0){const ratio=pe/growth;valuation=ratio<=.8?95:ratio<=1.1?88:ratio<=1.5?78:ratio<=2?65:ratio<=2.5?50:34}else if(peg!=null&&peg>0){valuation=peg<.8?92:peg<1.1?85:peg<1.5?76:peg<2?63:peg<2.5?50:34}else if(pe!=null&&pe>0){valuation=pe<15?80:pe<22?70:pe<30?60:pe<45?47:30}
 if(valuation!=null&&industryPe!=null&&industryPe>0&&pe>0){const rel=pe/industryPe;valuation=clamp(valuation+(rel<.8?7:rel<1?-2:rel>1.5?-10:rel>1.2?-5:0))}
 const fairUpside=price>0&&safeBase>0?((safeBase/price)-1)*100:null;
-if(valuation!=null&&fairUpside!=null)valuation=clamp(valuation+(fairUpside>=25?10:fairUpside>=10?6:fairUpside<=-25?-12:fairUpside<0?-6:0));
+if(valuation!=null&&fairUpside!=null)valuation=clamp(valuation+(fairUpside>=25?10:...));
 const expectedReturn=fairUpside!=null?clamp(50+fairUpside*1.15):null,bearReturn=price>0&&safeLow>0?((safeLow/price)-1)*100:null,baseReturn=fairUpside,bullReturn=price>0&&safeHigh>0?((safeHigh/price)-1)*100:null;
 let risk=beta==null?60:(beta<=.9?84:beta<=1.2?76:beta<=1.5?67:beta<=2?55:40);
 if(risk!=null){if(growth!=null&&growth<0)risk-=18;if(revenue!=null&&revenue<0)risk-=14;if(margin!=null&&margin<0)risk-=20;if(fcf!=null&&fcf<0)risk-=15;if(debt!=null&&debt>150&&industry!=="Financials")risk-=12;risk=clamp(risk)}
 const modifiers=weighted([["revision",revision==null?null:clamp(revision),.6],["news",news==null?null:clamp(news),.4]]);
 const parts=[[quality,.20],[growthScoreFinal,.25],[valuation,.25],[expectedReturn,.20],[risk,.10]],valid=parts.filter(([,v])=>v!=null);
-let rawScore=valid.length?valid.reduce((a,[v])=>a+v,0)/valid.length:null;
+let rawScore=valid.length?valid.reduce((a,[v,w])=>a+v*w,0)/valid.reduce((a,[,w])=>a+w,0):null;
 const coverage=[growth,revenue,margin,roe,fcf,debt,pe,beta,safeBase].filter(v=>v!=null).length/9;
 const missingPenalty=(hasForwardGrowth?0:8)+(hasForwardPE?0:7)+(safeBase!=null?0:7)+(beta!=null?0:4)+(coverage<.67?8:coverage<.78?4:0);
-let score=rawScore==null?null:clamp(rawScore-missingPenalty);
+let score=rawScore==null?null:clamp(rawScore-missingPenalty+(modifiers==null?0:(modifiers-50)*0.1));
 const warnings=[],positives=[],blockedReasons=[];
 if(!hasForwardGrowth)warnings.push("ยังไม่มี EPS Growth คาดการณ์ — ระบบพยายามใช้ Growth ล่าสุดที่ตรวจสอบได้แทน");
 if(!hasForwardPE)warnings.push("ยังไม่มี Forward P/E — ใช้ Trailing P/E หากมี");
