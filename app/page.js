@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { investmentDecision } from "./lib/investmentDecision";
 
 const fmt=(n,d=2)=>n==null||n===""||Number.isNaN(Number(n))?"—":Number(n).toLocaleString("en-US",{maximumFractionDigits:d});
@@ -10,23 +10,7 @@ const scoreClass=n=>Number(n)>=75?"score good":Number(n)>=55?"score mid":"score 
 const badgeClass=s=>(s||"").toLowerCase().replaceAll(" ","-");
 const money=n=>Number(n||0).toLocaleString("en-US",{style:"currency",currency:"USD",maximumFractionDigits:2});
 const dateShort=x=>x?new Date(x).toLocaleDateString("en-US",{month:"short",day:"numeric"}):"—";
-const clamp=(n,min=0,max=100)=>Math.max(min,Math.min(max,n));
 const num=(v)=>Number.isFinite(Number(v))?Number(v):null;
-function industryProfile(s){
-  const text=`${s.industry||""} ${s.sector||""}`.toLowerCase();
-  if(/semiconductor|chip|memory|equipment/.test(text)) return {name:"Semiconductor",keys:["growth","margin","fcf","debt","valuation"]};
-  if(/software|application|internet|technology|tech/.test(text)) return {name:"Technology / Software",keys:["growth","margin","fcf","roe","valuation"]};
-  if(/health|biotech|pharma|drug|medical/.test(text)) return {name:"Healthcare",keys:["growth","margin","fcf","roe","valuation"]};
-  if(/financial|bank|asset management|capital market|insurance/.test(text)) return {name:"Financials",keys:["roe","margin","debt","valuation","growth"]};
-  if(/retail|consumer|apparel|automotive|restaurant/.test(text)) return {name:"Consumer",keys:["revenue","margin","roe","fcf","valuation"]};
-  return {name:"General",keys:["growth","margin","fcf","roe","valuation"]};
-}
-function metricScore(v,good,bad){
-  if(v==null) return null;
-  if(good>bad) return clamp(((v-bad)/(good-bad))*100);
-  return clamp(((bad-v)/(bad-good))*100);
-}
-
 const extractAnalystTarget=(items,price)=>{
   for(const n of (items||[])){
     const text=`${n.title||""} ${n.summary||""}`;
@@ -61,7 +45,7 @@ export default function Home(){
         if(result.status!=="fulfilled")return fallback;
         try{
           const data=await result.value.json();
-          return result.value.ok?data:fallback;
+          return data;
         }catch{return fallback}
       };
       const sd=await readJson(s,{stocks:[]});
@@ -144,18 +128,19 @@ export default function Home(){
   }
   const portfolioRows=Object.entries(portfolio).map(([ticker,p])=>{const s=merged.find(x=>x.ticker===ticker);const price=Number(quotes[ticker]?.price||s?.price||0);const qty=Number(p.qty||0);const avg=Number(p.avg||0);return {...s,ticker,qty,avg,price,value:qty*price,cost:qty*avg,pnl:qty*(price-avg)}}).filter(x=>x.qty>0);
   const totalValue=portfolioRows.reduce((a,x)=>a+x.value,0),totalCost=portfolioRows.reduce((a,x)=>a+x.cost,0),totalPnl=totalValue-totalCost;
+  const portfolioWithAllocation=portfolioRows.map(x=>({...x,allocation:totalValue>0?(x.value/totalValue)*100:0}));
   async function earningsBrief(){setEarnLoading(true);try{const r=await fetch("/api/ai/earnings",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({earnings,stocks:ranked})});const d=await r.json();setEarnBrief(d.text||d.error||"AI ยังไม่ได้ส่งคำตอบ")}catch{setEarnBrief("เชื่อมต่อ AI ไม่สำเร็จ")}finally{setEarnLoading(false)}}
   async function syncNow(){setSyncLoading(true);try{await fetch("/api/cron/sync",{method:"POST",headers:{"content-type":"application/json"},cache:"no-store"});await load()}finally{setSyncLoading(false)}}
   async function askBrief(){setBriefLoading(true);try{const r=await fetch("/api/ai/brief",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({stocks:ranked,changes,news})});const d=await r.json();setBrief(d.text||d.error||"AI ยังไม่ได้ส่งคำตอบ")}catch{setBrief("เชื่อมต่อ AI ไม่สำเร็จ")}finally{setBriefLoading(false)}}
   async function askAI(ticker){setAiLoading(true);setAi("");try{const r=await fetch("/api/ai",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({ticker,data:merged.find(s=>s.ticker===ticker),news:news.filter(n=>n.ticker===ticker).slice(0,8)})});const d=await r.json();setAi(d.text||d.error||"AI ยังไม่ได้เชื่อมต่อ")}catch{setAi("เชื่อมต่อ AI ไม่สำเร็จ")}finally{setAiLoading(false)}}
-  async function askChat(){const q=chatInput.trim();if(!q||chatLoading)return;setChatInput("");const nextMessages=[...chatMessages,{role:"user",text:q}].slice(-4);setChatMessages(nextMessages);setChatLoading(true);try{const r=await fetch("/api/ai/chat",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({question:q,history:nextMessages})});const d=await r.json();setChatMessages(m=>[...m,{role:"assistant",text:d.text||d.error||"AI ยังไม่ตอบ"}]);}catch{setChatMessages(m=>[...m,{role:"assistant",text:"เชื่อมต่อ AI ไม่สำเร็จ"}]);}finally{setChatLoading(false)}}
+  async function askChat(){const q=chatInput.trim();if(!q||chatLoading)return;setChatInput("");const history=chatMessages.slice(-4);setChatMessages(m=>[...m,{role:"user",text:q}]);setChatLoading(true);try{const r=await fetch("/api/ai/chat",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({question:q,history})});const d=await r.json();setChatMessages(m=>[...m,{role:"assistant",text:d.text||d.error||"AI ยังไม่ตอบ"}]);}catch{setChatMessages(m=>[...m,{role:"assistant",text:"เชื่อมต่อ AI ไม่สำเร็จ"}]);}finally{setChatLoading(false)}}
   async function explainChange(x){setChangeAILoading(x.ticker);try{const r=await fetch("/api/ai/change",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({ticker:x.ticker,current:x.current,previous:x.previous,earnings:earnings.find(e=>e.ticker===x.ticker)||null,news:news.filter(n=>n.ticker===x.ticker).slice(0,5)})});const d=await r.json();setChangeAI(v=>({...v,[x.ticker]:d.text||d.error||"AI ยังไม่ได้ส่งคำตอบ"}))}catch{setChangeAI(v=>({...v,[x.ticker]:"เชื่อมต่อ AI ไม่สำเร็จ"}))}finally{setChangeAILoading("")}}
   return <main className="app">
     <aside className="sidebar"><div className="brand"><div className="brandIcon">P</div><div><b>Pulsefolio</b><small>วิเคราะห์หุ้นสหรัฐฯ</small></div></div><nav>
       <Nav active={tab==="home"} onClick={()=>setTab("home")}>ภาพรวม</Nav><Nav active={tab==="rank"} onClick={()=>setTab("rank")}>จัดอันดับหุ้น</Nav><Nav active={tab==="watch"} onClick={()=>setTab("watch")}>รายการติดตาม <em>{watch.length}</em></Nav><Nav active={tab==="portfolio"} onClick={()=>setTab("portfolio")}>พอร์ตลงทุน <em>{portfolioRows.length}</em></Nav><Nav active={tab==="compare"} onClick={()=>setTab("compare")}>เปรียบเทียบหุ้น</Nav>
     </nav><div className="method"><span>โมเดลวิเคราะห์</span><b>Quality 20%</b><b>Growth 25%</b><b>Valuation 25%</b><b>Expected Return 20%</b><b>Risk 10%</b><small>ราคาตลาดอาจมีความล่าช้า</small></div></aside>
     <section className="main"><header className="header"><div><span className="eyebrow">แดชบอร์ดการลงทุนส่วนตัว</span><h1>{tab==="home"?"ภาพรวมตลาด":tab==="rank"?"จัดอันดับหุ้น":tab==="watch"?"รายการติดตาม":tab==="compare"?"เปรียบเทียบหุ้น":"พอร์ตลงทุน"}</h1></div><div className="searchWrap"><div className="searchbox">⌕<input value={search} onChange={e=>setSearch(e.target.value)} placeholder="ค้นหา Ticker หรือชื่อบริษัท"/></div>{search.trim().length>=2&&(searching||searchResults.length>0)&&<div className="searchResults">{searching?<div className="searchLoading">กำลังค้นหา…</div>:searchResults.map(x=><button className="searchResult" key={x.ticker} onClick={()=>addStock(x.ticker)}><span><b>{x.ticker}</b><small>{x.name} · {x.exchange}</small></span><em>{addingTicker===x.ticker?"กำลังเพิ่ม…":"เพิ่ม + "}</em></button>)}</div>}</div></header>
-      {loading?<div className="loading">กำลังโหลดข้อมูลตลาด…</div>:error?<div className="errorCard"><b>ยังโหลดข้อมูลสกอร์ไม่ได้</b><span>{error}</span><button className="primary" onClick={load}>ลองใหม่</button><small>ถ้ายังไม่ขึ้น ปัญหาอยู่ที่การเชื่อมต่อ API ไม่ใช่หน้าแสดงผล</small></div>:tab==="home"?<HomeView stocks={ranked} buys={buys} portfolioRows={portfolioRows} totalValue={totalValue} totalPnl={totalPnl} news={newsRows} earnings={earnings} changes={changes} lastUpdate={lastUpdate} investmentPicks={investmentPicks} insights={insights} brief={brief} briefLoading={briefLoading} syncLoading={syncLoading} earnBrief={earnBrief} earnLoading={earnLoading} changeAI={changeAI} changeAILoading={changeAILoading} dailyBrief={dailyBrief} alerts={alerts} onBrief={askBrief} onEarningsBrief={earningsBrief} onExplainChange={explainChange} onSync={syncNow} onOpen={openStock} onRank={()=>setTab("rank")} onReload={load}/>:tab==="rank"?<Ranking rows={filtered} onOpen={openStock}/>:tab==="watch"?<Watchlist rows={watchRows} onOpen={openStock}/>:tab==="compare"?<CompareView stocks={merged} selected={compareTickers} setSelected={setCompareTickers} onOpen={openStock}/>:<Portfolio rows={portfolioRows} totalValue={totalValue} totalCost={totalCost} totalPnl={totalPnl} onOpen={openStock}/>}
+      {loading?<div className="loading">กำลังโหลดข้อมูลตลาด…</div>:error?<div className="errorCard"><b>ยังโหลดข้อมูลสกอร์ไม่ได้</b><span>{error}</span><button className="primary" onClick={load}>ลองใหม่</button><small>ถ้ายังไม่ขึ้น ปัญหาอยู่ที่การเชื่อมต่อ API ไม่ใช่หน้าแสดงผล</small></div>:tab==="home"?<HomeView stocks={ranked} buys={buys} portfolioRows={portfolioRows} totalValue={totalValue} totalPnl={totalPnl} news={newsRows} earnings={earnings} changes={changes} lastUpdate={lastUpdate} investmentPicks={investmentPicks} insights={insights} brief={brief} briefLoading={briefLoading} syncLoading={syncLoading} earnBrief={earnBrief} earnLoading={earnLoading} changeAI={changeAI} changeAILoading={changeAILoading} dailyBrief={dailyBrief} alerts={alerts} onBrief={askBrief} onEarningsBrief={earningsBrief} onExplainChange={explainChange} onSync={syncNow} onOpen={openStock} onRank={()=>setTab("rank")} onReload={load}/>:tab==="rank"?<Ranking rows={filtered} onOpen={openStock}/>:tab==="watch"?<Watchlist rows={watchRows} onOpen={openStock}/>:tab==="compare"?<CompareView stocks={merged} selected={compareTickers} setSelected={setCompareTickers} onOpen={openStock}/>:<Portfolio rows={portfolioWithAllocation} totalValue={totalValue} totalCost={totalCost} totalPnl={totalPnl} onOpen={openStock}/>}
       <footer>ข้อมูลพื้นฐานและการวิเคราะห์ · ราคาตลาด: Yahoo Finance · ข่าวและงบ: Yahoo/Google · AI: Gemini</footer><button className="chatFab" onClick={()=>setChatOpen(v=>!v)}>AI</button>{chatOpen&&<AIChat input={chatInput} setInput={setChatInput} messages={chatMessages} loading={chatLoading} onSend={askChat} onClose={()=>setChatOpen(false)}/>}
     </section>
     {selected&&<StockDrawer insights={insights[selected.ticker]} stock={selected} onClose={()=>{setSelected(null);setAi("")}} onAI={()=>askAI(selected.ticker)} ai={ai} aiLoading={aiLoading} watch={watch} setWatch={setWatch} portfolio={portfolio} setPortfolio={setPortfolio} onRemove={()=>removeStock(selected.ticker)}/>}
@@ -239,9 +224,9 @@ function InvestmentPick({s,rank,insights,onOpen}){
 function Opportunity({s,onOpen}){const price=s.price;const change=s.changePct;const d=s.investmentDecision||investmentDecision(s);return <button className="opportunity" onClick={()=>onOpen(s)}><div className="ticker"><b>{s.ticker}</b><span>{s.name}</span></div><div className={scoreClass(d.score)}>{fmt(d.score,0)}</div><div className="opBody"><span className={"badge "+badgeClass(d.label)}>{d.label}</span><span>โอกาส {fmt(d.opportunity,0)}</span><span>ข้อมูล {d.dataQuality??"—"}% · {d.confidence||"—"}</span><span>Fwd P/E {fmt(s.forward_pe,1)}x</span></div><div className="miniVal">ราคา <b>{usd(price)} <i className={change>=0?"up":"down"}>{change==null?"":(change>=0?"+":"")+fmt(change,1)+"%"}</i></b></div></button>}
 
 function Ranking({rows,onOpen}){return <div className="section"><SectionHead title="จัดอันดับตาม Investment Decision" action={rows.length+" stocks"}/><div className="rankTable"><div className="rankHead"><span>#</span><span>หุ้น</span><span>ราคา</span><span>คะแนน</span><span>Valuation</span><span>Growth</span><span>Quality</span><span>โซน</span></div>{rows.map((s,i)=>{const d=s.investmentDecision||investmentDecision(s);return <button className="rankRow" key={s.ticker} onClick={()=>onOpen(s)}><span>{d.score==null?"—":i+1}</span><span className="ticker"><b>{s.ticker}</b><small>{s.name}</small></span><span>{usd(s.price)}</span><span className={scoreClass(d.score)}>{fmt(d.score,0)}</span><span>{fmt(d.valuation,0)}</span><span>{fmt(d.growth,0)}</span><span>{fmt(d.quality,0)}</span><span><b className={"badge "+badgeClass(d.label)}>{d.label}</b></span></button>})}</div></div>}
-function Watchlist({rows,onOpen}){return <div className="section"><SectionHead title="หุ้นที่ติดตาม" action={rows.length+" รายการ"}/>{rows.length?<div className="watchList">{rows.map(s=><Opportunity key={s.ticker} s={s} onOpen={onOpen}/>)}</div>:<div className="empty">ยังไม่มีหุ้นในรายการติดตาม — เปิดหุ้นจาก Ranking แล้วกด + เพิ่มในWatchlist</div>}</div>}
+function Watchlist({rows,onOpen}){return <div className="section"><SectionHead title="หุ้นที่ติดตาม" action={rows.length+" รายการ"}/>{rows.length?<div className="watchList">{rows.map(s=><Opportunity key={s.ticker} s={s} onOpen={onOpen}/>)}</div>:<div className="empty">ยังไม่มีหุ้นในรายการติดตาม — เปิดหุ้นจาก Ranking แล้วกด + เพิ่มในรายการติดตาม</div>}</div>}
 
-function Portfolio({rows,totalValue,totalCost,totalPnl,onOpen}){const ret=totalCost?(totalPnl/totalCost)*100:null;return <div className="portfolioPage"><div className="portfolioCards"><Metric label="มูลค่าปัจจุบัน" value={money(totalValue)}/><Metric label="ต้นทุน" value={money(totalCost)}/><Metric label="กำไร/ขาดทุน" value={(totalPnl>=0?"+":"")+money(totalPnl)} sub={ret==null?"":(ret>=0?"+":"")+fmt(ret,1)+"%"}/></div><div className="section"><SectionHead title="หุ้นในพอร์ต" action={rows.length+" รายการ"}/>{rows.length?<div className="holdings">{rows.map(s=><button className="holding" key={s.ticker} onClick={()=>onOpen(s)}><span><b>{s.ticker}</b><small>{fmt(s.qty,4)} shares · avg {usd(s.avg)}</small></span><span><b>{money(s.value)}</b><small className={s.pnl>=0?"up":"down"}>{s.pnl>=0?"+":""}{money(s.pnl)}</small></span></button>)}</div>:<div className="empty">ยังไม่มีหุ้นในพอร์ตลงทุน — เปิดหุ้นแล้วกรอกจำนวนหุ้นและต้นทุนเฉลี่ย</div>}</div></div>}
+function Portfolio({rows,totalValue,totalCost,totalPnl,onOpen}){const ret=totalCost?(totalPnl/totalCost)*100:null;const concentrated=rows.filter(s=>s.allocation>35);return <div className="portfolioPage"><div className="portfolioCards"><Metric label="มูลค่าปัจจุบัน" value={money(totalValue)}/><Metric label="ต้นทุน" value={money(totalCost)}/><Metric label="กำไร/ขาดทุน" value={(totalPnl>=0?"+":"")+money(totalPnl)} sub={ret==null?"":(ret>=0?"+":"")+fmt(ret,1)+"%"}/></div>{concentrated.length>0&&<div className="notice concentrationWarning"><b>⚠ ความเสี่ยงกระจุกตัว:</b> {concentrated.map(s=>s.ticker).join(", ")} มีสัดส่วนเกิน 35% ของมูลค่าพอร์ต ({concentrated.map(s=>s.ticker+" "+fmt(s.allocation,1)+"%").join(" · ")})</div>}<div className="section"><SectionHead title="หุ้นในพอร์ต" action={rows.length+" รายการ"}/>{rows.length?<div className="holdings">{rows.map(s=><button className="holding" key={s.ticker} onClick={()=>onOpen(s)}><span><b>{s.ticker}</b><small>{fmt(s.qty,4)} shares · avg {usd(s.avg)}</small><span className="allocationWrap"><span className="allocationBar"><i style={{width:Math.min(100,s.allocation)+"%"}}/></span><small>{fmt(s.allocation,1)}% ของพอร์ต</small></span></span><span><b>{money(s.value)}</b><small className={s.pnl>=0?"up":"down"}>{s.pnl>=0?"+":""}{money(s.pnl)}</small></span></button>)}</div>:<div className="empty">ยังไม่มีหุ้นในพอร์ตลงทุน — เปิดหุ้นแล้วกรอกจำนวนหุ้นและต้นทุนเฉลี่ย</div>}</div></div>}
 
 function NewsItem({n}){return <a className="newsItem" href={n.url||"#"} target="_blank" rel="noreferrer"><span className="newsTicker">{n.ticker}</span><div><b>{n.title}</b><small>{n.source||"ข่าว"} · {n.publishedAt?dateShort(n.publishedAt):""}</small></div></a>}
 
@@ -250,12 +235,12 @@ function StockDrawer({insights:insight,stock:s,onClose,onAI,ai,aiLoading,watch,s
  const price=Number(s.price||s.db_price||0),upside=s.fair_value_base&&price?((Number(s.fair_value_base)/price-1)*100):null;
  const pegReliable=!((s.industry||"").toLowerCase().includes("semiconductor")||((s.sector||"").toLowerCase().includes("consumer")&&Number(s.growth_current||0)>Number(s.growth_next||0)*1.8));
  function saveHolding(){const q=Number(qty),a=Number(avg);if(q>0&&a>0)setPortfolio(p=>({...p,[s.ticker]:{qty:q,avg:a}}));else setPortfolio(p=>{const x={...p};delete x[s.ticker];return x})}
- const decision=investmentDecision(s);
+ const decision=s.investmentDecision||investmentDecision(s);
  return <div className="drawerBack" onClick={e=>{if(e.target===e.currentTarget)onClose()}}><aside className="drawer"><button className="close" onClick={onClose}>×</button>
  <div className="drawerTop"><div><span className="eyebrow">{s.sector} · {s.industry}</span><h2>{s.ticker}</h2><p>{s.name}</p></div><div className={scoreClass(decision.score)}>{fmt(decision.score,0)}</div></div>
  <div className="priceLine"><strong>{usd(price)}</strong><span>มูลค่ายุติธรรม {decision.fairValueStatus==="verified"?usd(s.fair_value_base):"รอตรวจสอบ"}</span><span className={upside>=0?"up":"down"}>{decision.fairValueStatus==="verified"&&upside!=null?(upside>=0?"+":"")+fmt(upside,1)+"%":"—"}</span></div><div className="freshness"><b>คุณภาพข้อมูล {decision.dataQuality??"—"}% · ความมั่นใจ {decision.confidence||"—"} · {decision.buyReady?"ผ่านเกณฑ์ข้อมูล":"ยังไม่ผ่านเกณฑ์ซื้อ"}</b><br/>อัปเดตข้อมูล {s.updated_at?new Date(s.updated_at).toLocaleString("en-US",{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"}):"—"} · {s.data_source||"Supabase"}</div>
  <div className="actions2"><button className="primary" onClick={()=>setWatch(w=>isWatch?w.filter(x=>x!==s.ticker):[...w,s.ticker])}>{isWatch?"✓ อยู่ในรายการติดตาม":"+ เพิ่มในรายการติดตาม"}</button><button className="secondary" onClick={onAI}>{aiLoading?"กำลังวิเคราะห์…":"ให้ Gemini วิเคราะห์"}</button><button className="dangerBtn" onClick={onRemove}>ลบหุ้นออก</button></div>
- <div className="zone"><span className={"badge "+badgeClass(investmentDecision(s).label)}>{investmentDecision(s).label}</span><div><small>ช่วงมูลค่ายุติธรรม</small><b>{usd(s.fair_value_low)} / {usd(s.fair_value_base)} / {usd(s.fair_value_high)}</b></div></div>
+ <div className="zone"><span className={"badge "+badgeClass(decision.label)}>{decision.label}</span><div><small>ช่วงมูลค่ายุติธรรม</small><b>{usd(s.fair_value_low)} / {usd(s.fair_value_base)} / {usd(s.fair_value_high)}</b></div></div>
  <InvestmentSnapshot stock={s} price={price} upside={upside}/>
  <GrowthValuationFit stock={s}/>
  <PriceScenario stock={s} price={price}/>
@@ -269,7 +254,7 @@ function StockDrawer({insights:insight,stock:s,onClose,onAI,ai,aiLoading,watch,s
  </aside></div>
 }
 function BusinessDecision({stock:s}){
- const d=investmentDecision(s);
+ const d=s.investmentDecision||investmentDecision(s);
  const action=d.label==="น่าลงทุนมาก"||d.label==="น่าลงทุน"?"เข้าได้ถ้ารับความเสี่ยงได้":d.label==="รอจังหวะ"?"ธุรกิจอาจดี แต่ราคาหรือความเสี่ยงยังไม่คุ้ม":d.label==="ข้อมูลไม่ครบ"?"ยังไม่ควรตัดสินใจ":"ยังไม่ควรเข้าลงทุน";
  const next=d.label==="รอจังหวะ"?(d.fairUpside!=null&&d.fairUpside>0?"รอราคาย่อลง/ให้ Upside ดีขึ้น":"รอข้อมูลกำไรและ Valuation ชัดขึ้น"):(d.warnings[0]||"ติดตามงบและประมาณการครั้งถัดไป");
  return <section className={"businessDecision "+(d.score>=68?"good":d.score<45?"bad":"wait")}>
@@ -282,7 +267,7 @@ function BusinessDecision({stock:s}){
  </section>
 }
 function InvestmentSnapshot({stock:s,price,upside}){
- const target=extractAnalystTarget(s.news||[],price),d=investmentDecision(s);
+ const target=extractAnalystTarget(s.news||[],price),d=s.investmentDecision||investmentDecision(s);
  const scores=[["Quality",d.quality],["Growth",d.growth],["Valuation",d.valuation],["Risk",d.risk]];
  const positive=(s.growth_next!=null&&Number(s.growth_next)>0)||(target&&target.upside>0)||(upside!=null&&upside>0);
  return <section className="investmentSnapshot">
@@ -373,8 +358,7 @@ function IntelligencePanel({s,insight}){
  const expected=low>0&&base>0&&high>0?(low*.25+base*.5+high*.25):null;
  const expectedUpside=expected&&price>0?((expected/price)-1)*100:null;
  const relative=current>0&&peer>0?((current/peer)-1)*100:null;
- const fit=current>0&&growth>0?current/growth:null;
- const thesis=[];
+  const thesis=[];
  if(growth>0) thesis.push("กำไรมีแนวโน้มเติบโต");
  if(relative!=null&&relative<=10) thesis.push("Valuation ไม่ได้สูงกว่าค่าเฉลี่ยกลุ่มมาก");
  if(r.trend==="ปรับประมาณการขึ้น") thesis.push("ประมาณการกำไรมีทิศทางดีขึ้น");
