@@ -20,7 +20,7 @@ export async function POST(req){
 FUNDAMENTALS: ${JSON.stringify(fundamentals)}
 ANALYSIS: ${JSON.stringify(analysis)}
 NEWS: ${JSON.stringify(news)}
-DAILY BRIEFINGS: ${JSON.stringify(briefings)}`;
+{dailyBrief&&<section className="section"><SectionHead title="สรุปตลาดประจำวัน" action={dailyBrief.briefing_date||""}/><div className="brief">{dailyBrief.briefing_text}</div></section>}
     const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),30000);
     try{
       const r=await fetch("https://generativelanguage.googleapis.com/v1beta/interactions",{method:"POST",headers:{"Content-Type":"application/json","x-goog-api-key":key},body:JSON.stringify({model:"gemini-3.8-flash",input:prompt}),signal:controller.signal});
