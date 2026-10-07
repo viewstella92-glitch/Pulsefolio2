@@ -20,7 +20,7 @@ export async function GET(){
         const d=await r.json(); const m=d?.chart?.result?.[0]?.meta||{};
         const price=Number(m.regularMarketPrice);
         const previous=Number(m.chartPreviousClose??m.previousClose);
-        return {ticker:s.ticker,price:Number.isFinite(price)?price:null,previous:Number.isFinite(previous)?previous:null,change:Number.isFinite(price)&&Number.isFinite(previous)?price-previous:null,changePct:Number.isFinite(price)&&previous?(price/previous-1)*100:null,currency:m.currency||"USD",marketTime:m.regularMarketTime?m.regularMarketTime*1000:null};
+        return {ticker:s.ticker,price:Number.isFinite(price)?price:null,previous:Number.isFinite(previous)?previous:null,change:Number.isFinite(price)&&Number.isFinite(previous)?Number((price-previous).toFixed(4)):null,changePct:Number.isFinite(price)&&previous?Number(((price/previous-1)*100).toFixed(2)):null,currency:m.currency||"USD",marketTime:m.regularMarketTime?m.regularMarketTime*1000:null};
       }catch{return {ticker:s.ticker,price:null,previous:null,change:null,changePct:null,currency:"USD",marketTime:null};}
     }));
     return NextResponse.json({quotes,updatedAt:new Date().toISOString()});
