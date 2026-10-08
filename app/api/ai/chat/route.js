@@ -1,125 +1,43 @@
 import { callGemini } from "../../../lib/gemini";
+import { getVerified } from "../../../lib/edgar";
 export const maxDuration=60;
-
+const ALIASES={nvidia:"NVDA","เอ็นวิเดีย":"NVDA","เอนวิเดีย":"NVDA","เอ็นวีเดีย":"NVDA",salesforce:"CRM","เซลส์ฟอร์ซ":"CRM","เซลฟอร์ซ":"CRM",cigna:"CI","ซิกน่า":"CI",micron:"MU","ไมครอน":"MU",adobe:"ADBE","อะโดบี":"ADBE","อโดบี":"ADBE",applovin:"APP","แอปเลิฟวิน":"APP",intuit:"INTU","อินทูอิท":"INTU",netflix:"NFLX","เน็ตฟลิกซ์":"NFLX","เน็ตฟลิก":"NFLX",vertiv:"VRT","เวอร์ทิฟ":"VRT",mercadolibre:"MELI","เมอร์คาโด":"MELI",grab:"GRAB","แกร็บ":"GRAB","แกรบ":"GRAB",zoetis:"ZTS","โซเอทิส":"ZTS",autozone:"AZO","ออโต้โซน":"AZO",blackrock:"BLK","แบล็คร็อค":"BLK","แบลคร็อก":"BLK",mastercard:"MA","มาสเตอร์การ์ด":"MA",apple:"AAPL","แอปเปิล":"AAPL","แอปเปิ้ล":"AAPL","arm holdings":"ARM","อาร์ม":"ARM","astera labs":"ALAB","แอสเทอรา":"ALAB",centrus:"LEU","เซ็นทรัส":"LEU","novo nordisk":"NVO","โนโว":"NVO",broadcom:"AVGO","บรอดคอม":"AVGO"};
+const NAME_STOP=new Set(["the","inc","corp","corporation","company","holdings","group","global","international","american","united","first","new"]);
+const compactVerified=v=>{if(!v?.ok)return {ticker:v?.ticker,available:false,reason:v?.reason||"ไม่มีข้อมูลที่ตรวจสอบได้"};const m=v.metrics||{},p=x=>x?{value:x.value,asOf:x.asOf}:null;return {ticker:v.ticker,name:v.name,price:v.price,revenueTtm:p(m.revenueTtm),netIncomeTtm:p(m.netIncomeTtm),epsDilutedTtm:p(m.epsDilutedTtm),freeCashFlowTtm:p(m.freeCashFlowTtm),valuation:v.valuation,derived:v.derived,trust:v.trust}};
+const withTimeout=(promise,ms,fallback)=>Promise.race([promise,new Promise(r=>setTimeout(()=>r(fallback),ms))]);
 export async function POST(req){
-  const key=process.env.GEMINI_API_KEY;
-  const supabaseUrl=process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseKey=process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
-  if(!key||!supabaseUrl||!supabaseKey){
-    return Response.json({error:"AI/Supabase environment variables are missing"},{status:500});
-  }
-
-  try{
-    const body=await req.json().catch(()=>({}));
-    const question=typeof body?.question==="string"
-      ? body.question
-      : typeof body?.message==="string"
-        ? body.message
-        : "";
-    if(!question.trim())return Response.json({error:"กรุณาระบุคำถาม"},{status:400});
-    if(question.length>4000)return Response.json({error:"คำถามยาวเกินไป"},{status:400});
-
-    const history=Array.isArray(body?.history)
-      ? body.history.slice(-4).map(x=>({
-          role:x?.role==="assistant"?"assistant":"user",
-          text:String(x?.text??x?.content??"").slice(0,1500)
-        })).filter(x=>x.text.trim())
-      : [];
-
-    const headers={apikey:supabaseKey,Authorization:"Bearer "+supabaseKey};
-    const base=supabaseUrl+"/rest/v1/";
-
-    const [f,a,n,b,state]=await Promise.all([
-      fetch(base+"stock_fundamentals?select=ticker,name,price,trailing_pe,forward_pe,peg,growth_current,growth_next,growth_long,revenue_growth,roe,profit_margin,free_cash_flow,debt_to_equity,beta,industry_forward_pe,fair_value_low,fair_value_base,fair_value_high,market_cap,updated_at,data_source,data_quality,eps_estimate_current,eps_estimate_7d,eps_estimate_30d,eps_estimate_60d,eps_estimate_90d,earnings_revision_score",{headers,cache:"no-store"}),
-      fetch(base+"stock_analysis?select=ticker,valuation_score,growth_score,quality_score,risk_score,news_score,updated_at",{headers,cache:"no-store"}),
-      fetch(base+"stock_news?select=ticker,title,source,summary,sentiment,category,impact_score,published_at&order=published_at.desc&limit=60",{headers,cache:"no-store"}),
-      fetch(base+"daily_market_briefing?select=briefing_date,briefing_text,generated_at&order=briefing_date.desc&limit=3",{headers,cache:"no-store"}),
-      fetch(base+"pulsefolio_state?id=eq.1&select=watchlist,portfolio",{headers,cache:"no-store"})
-    ]);
-
-    const [fundamentals,analysis,news,briefings,stateRows]=await Promise.all([
-      f.json().catch(()=>[]),
-      a.json().catch(()=>[]),
-      n.json().catch(()=>[]),
-      b.json().catch(()=>[]),
-      state.json().catch(()=>[])
-    ]);
-
-    if(!f.ok||!a.ok||!n.ok||!b.ok||!state.ok){
-      return Response.json({error:"โหลดข้อมูลจาก Supabase ไม่สำเร็จ"},{status:500});
-    }
-
-    const knownTickers=new Set(
-      (fundamentals||[])
-        .map(x=>String(x.ticker||"").trim().toUpperCase())
-        .filter(Boolean)
-    );
-    const tickerMatches=[...question.matchAll(/(?<![A-Za-z])\$?([A-Z]{1,5}(?:[.-][A-Z]{1,3})?)(?![A-Za-z])/g)].map(m=>m[1]).filter(t=>knownTickers.has(t));
-    const tickers=[...new Set(tickerMatches)];
-
-    const stateRow=stateRows?.[0]||{watchlist:[],portfolio:{}};
-    const portfolioState={
-      watchlist:Array.isArray(stateRow.watchlist)?stateRow.watchlist:[],
-      portfolio:stateRow.portfolio&&typeof stateRow.portfolio==="object"?stateRow.portfolio:{}
-    };
-    const mine=[...new Set([...Object.keys(portfolioState.portfolio),...portfolioState.watchlist])].map(x=>String(x).toUpperCase());
-    const wantsMine=/พอร์ต|ถืออยู่|ติดตาม|portfolio|watchlist/i.test(question);
-    const scope=tickers.length?tickers:(wantsMine&&mine.length?mine:[]);
-    const filterByTicker=(rows)=>scope.length
-      ? (rows||[]).filter(x=>scope.includes(String(x.ticker||"").toUpperCase()))
-      : (rows||[]);
-
-    const filteredFundamentals=filterByTicker(fundamentals);
-    const filteredAnalysis=filterByTicker(analysis);
-    const filteredNews=filterByTicker(news).map(x=>({
-      ...x,
-      summary:String(x.summary||"").slice(0,200)
-    }));
-
-    const historyText=history.length
-      ? history.map(x=>`${x.role==="assistant"?"AI":"ผู้ใช้"}: ${x.text}`).join("\n")
-      : "ไม่มีประวัติบทสนทนา";
-
-    const scopeText=scope.length
-      ? `ใช้ Fundamentals / Analysis / News เฉพาะหุ้นในขอบเขตนี้: ${scope.join(", ")}`
-      : "ไม่พบ ticker หรือขอบเขตพอร์ต/รายการติดตามที่ตรงกับข้อมูล จึงใช้ข้อมูลหุ้นทั้งหมดที่มี";
-
-    const prompt=`คุณคือ AI Analyst ของ Pulsefolio ตอบจากข้อมูลที่แนบเท่านั้น
-ห้ามสร้างตัวเลขหรือเติมข้อมูลที่ไม่มี ห้ามถือว่า null/— เป็นศูนย์
-ตัวเลขใน ANALYSIS เป็นคะแนนย่อยดิบ ไม่ใช่คะแนนรวมที่แสดงบนหน้าเว็บ ห้ามอ้างเป็นคะแนนรวม
-ถ้าข้อมูลสำคัญไม่พอให้บอกว่าไม่พอ
-ตอบภาษาไทย กระชับ มีเหตุผล และแยกข้อเท็จจริงจากการตีความ
-เมื่อพูดถึงตัวเลขให้ยึดข้อมูลล่าสุดที่แนบมา และระบุวันที่/แหล่งเมื่อมี
-ห้ามรับประกันผลตอบแทนและไม่ให้คำแนะนำเฉพาะบุคคล
-
-คำถามปัจจุบัน:
-${question}
-
-ประวัติบทสนทนาล่าสุด:
-${historyText}
-
-ขอบเขตข้อมูล:
-${scopeText}
-
-WATCHLIST / PORTFOLIO ของผู้ใช้:
-${JSON.stringify(portfolioState)}
-
-FUNDAMENTALS:
-${JSON.stringify(filteredFundamentals)}
-
-ANALYSIS:
-${JSON.stringify(filteredAnalysis)}
-
-NEWS (summary ถูกจำกัดไม่เกิน 200 ตัวอักษรต่อข่าว):
-${JSON.stringify(filteredNews)}
-
-DAILY MARKET BRIEF:
-${JSON.stringify(briefings||[])}`;
-
-    const result=await callGemini(prompt,key,{budgetMs:55000,perModelMs:20000});
-    if(!result.ok)return Response.json({error:result.reason,details:result.attempts},{status:502});
-    return Response.json({text:result.text,model:result.model,attempts:result.attempts});
-  }catch(e){
-    return Response.json({error:e?.message||"AI chat failed"},{status:500});
-  }
-}
+const key=process.env.GEMINI_API_KEY,supabaseUrl=process.env.NEXT_PUBLIC_SUPABASE_URL,supabaseKey=process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+if(!key||!supabaseUrl||!supabaseKey)return Response.json({error:"AI/Supabase environment variables are missing"},{status:500});
+try{
+const body=await req.json().catch(()=>({}));
+const question=typeof body?.question==="string"?body.question:typeof body?.message==="string"?body.message:"";
+if(!question.trim())return Response.json({error:"กรุณาระบุคำถาม"},{status:400});
+if(question.length>4000)return Response.json({error:"คำถามยาวเกินไป"},{status:400});
+const history=Array.isArray(body?.history)?body.history.slice(-4).map(x=>({role:x?.role==="assistant"?"assistant":"user",text:String(x?.text??x?.content??"").slice(0,1500)})).filter(x=>x.text.trim()):[];
+const headers={apikey:supabaseKey,Authorization:"Bearer "+supabaseKey},base=supabaseUrl+"/rest/v1/";
+const [f,a,n,b,state]=await Promise.all([
+fetch(base+"stock_fundamentals?select=ticker,name,price,trailing_pe,forward_pe,peg,growth_current,growth_next,growth_long,revenue_growth,roe,profit_margin,free_cash_flow,debt_to_equity,beta,industry_forward_pe,fair_value_low,fair_value_base,fair_value_high,market_cap,updated_at,data_source,data_quality,eps_estimate_current,eps_estimate_7d,eps_estimate_30d,eps_estimate_60d,eps_estimate_90d,earnings_revision_score",{headers,cache:"no-store"}),
+fetch(base+"stock_analysis?select=ticker,valuation_score,growth_score,quality_score,risk_score,news_score,updated_at",{headers,cache:"no-store"}),
+fetch(base+"stock_news?select=ticker,title,source,summary,sentiment,category,impact_score,published_at&order=published_at.desc&limit=60",{headers,cache:"no-store"}),
+fetch(base+"daily_market_briefing?select=briefing_date,briefing_text,generated_at&order=briefing_date.desc&limit=3",{headers,cache:"no-store"}),
+fetch(base+"pulsefolio_state?id=eq.1&select=watchlist,portfolio",{headers,cache:"no-store"})]);
+const [fundamentals,analysis,news,briefings,stateRows]=await Promise.all([f.json().catch(()=>[]),a.json().catch(()=>[]),n.json().catch(()=>[]),b.json().catch(()=>[]),state.json().catch(()=>[])]);
+if(!f.ok||!a.ok||!n.ok||!b.ok||!state.ok)return Response.json({error:"โหลดข้อมูลจาก Supabase ไม่สำเร็จ"},{status:500});
+const knownTickers=new Set((fundamentals||[]).map(x=>String(x.ticker||"").trim().toUpperCase()).filter(Boolean));
+const tokenMatches=(question.match(/(?<![A-Za-z])\$?[A-Za-z]{1,5}(?:[.-][A-Za-z]{1,3})?(?![A-Za-z])/g)||[]).map(t=>t.replace(/^\$/,"").toUpperCase()).filter(t=>knownTickers.has(t));
+const q=question.toLowerCase(),nameAlias=new Map(Object.entries(ALIASES));
+for(const x of fundamentals||[]){const w=String(x.name||"").toLowerCase().split(/[\s,.]+/)[0];if(w.length>=5&&!NAME_STOP.has(w))nameAlias.set(w,String(x.ticker||"").toUpperCase())}
+const aliasMatches=[...nameAlias].filter(([al,t])=>q.includes(al)&&knownTickers.has(t)).map(([,t])=>t),tickers=[...new Set([...tokenMatches,...aliasMatches])];
+const stateRow=stateRows?.[0]||{watchlist:[],portfolio:{}},portfolioState={watchlist:Array.isArray(stateRow.watchlist)?stateRow.watchlist:[],portfolio:stateRow.portfolio&&typeof stateRow.portfolio==="object"?stateRow.portfolio:{}};
+const mine=[...new Set([...Object.keys(portfolioState.portfolio),...portfolioState.watchlist])].map(x=>String(x).toUpperCase()),wantsMine=/พอร์ต|ถืออยู่|ติดตาม|portfolio|watchlist/i.test(question),scope=tickers.length?tickers:(wantsMine&&mine.length?mine:[]);
+const filterByTicker=rows=>scope.length?(rows||[]).filter(x=>scope.includes(String(x.ticker||"").toUpperCase())):(rows||[]);
+const compact=r=>({ticker:r.ticker,name:r.name,price:r.price,trailing_pe:r.trailing_pe,forward_pe:r.forward_pe,peg:r.peg,growth_next:r.growth_next,fair_value_low:r.fair_value_low,fair_value_base:r.fair_value_base,fair_value_high:r.fair_value_high,data_quality:r.data_quality,updated_at:r.updated_at});
+const filteredFundamentals=scope.length?filterByTicker(fundamentals):(fundamentals||[]).map(compact),filteredAnalysis=filterByTicker(analysis),filteredNews=(scope.length?filterByTicker(news):(news||[]).slice(0,20)).map(x=>({...x,summary:String(x.summary||"").slice(0,200)}));
+const named=tickers.slice(0,3),verified=named.length?(await Promise.all(named.map(t=>withTimeout(getVerified(t),12000,{ok:false,ticker:t,reason:"หมดเวลาดึงข้อมูลจาก SEC"})))).map(compactVerified):[];
+const historyText=history.length?history.map(x=>(x.role==="assistant"?"AI":"ผู้ใช้")+": "+x.text).join("\n"):"ไม่มีประวัติบทสนทนา";
+const scopeText=scope.length?"ใช้ Fundamentals / Analysis / News เฉพาะหุ้นในขอบเขตนี้: "+scope.join(", "):"ไม่พบ ticker หรือขอบเขตพอร์ต/รายการติดตามที่ตรงกับข้อมูล จึงส่งเฉพาะข้อมูลสรุปของหุ้นทั้งหมดที่มี";
+const prompt="คุณคือ AI Analyst ของ Pulsefolio\nกฎ: ใช้เฉพาะข้อมูลที่แนบ ห้ามสร้าง/เดาตัวเลข ห้ามถือ null เป็นศูนย์; หาก VERIFIED ขัดกับ FUNDAMENTALS ให้ยึด VERIFIED และแจ้งความขัดแย้ง; ตัวเลข ANALYSIS เป็นคะแนนย่อยไม่ใช่คะแนนรวม; ข่าวต้องมาจาก NEWS; ถ้าข้อมูลไม่พอให้บอกว่าไม่พอ; ตอบภาษาไทย กระชับ แยกข้อเท็จจริงจากการตีความ และห้ามฟันธงซื้อ/ขายหรือรับประกันผลตอบแทน.\n\nคำถาม:\n"+question+"\n\nประวัติ:\n"+historyText+"\n\nขอบเขต:\n"+scopeText+"\n\nWATCHLIST / PORTFOLIO:\n"+JSON.stringify(portfolioState)+"\n\nVERIFIED:\n"+JSON.stringify(verified)+"\n\nFUNDAMENTALS:\n"+JSON.stringify(filteredFundamentals)+"\n\nANALYSIS:\n"+JSON.stringify(filteredAnalysis)+"\n\nNEWS (summary <=200 chars):\n"+JSON.stringify(filteredNews)+"\n\nDAILY MARKET BRIEF:\n"+JSON.stringify(briefings||[]);
+const result=await callGemini(prompt,key,{budgetMs:42000,perModelMs:20000});
+if(!result.ok)return Response.json({error:result.reason,details:result.attempts},{status:502});
+return Response.json({text:result.text,model:result.model,attempts:result.attempts});
+}catch(e){return Response.json({error:e?.message||"AI chat failed"},{status:500})}}
