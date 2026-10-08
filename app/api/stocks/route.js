@@ -23,7 +23,7 @@ async function enrichWithVerified(stock){
     src[k]=label;
   };
 
-  const v=await getVerified(out.ticker);
+  const v=await Promise.race([getVerified(out.ticker),new Promise(r=>setTimeout(()=>r({ok:false,ticker:out.ticker,reason:"หมดเวลาดึงข้อมูลจาก SEC"}),10000))]);
   if(v.ok){
     const secDate=v.metrics?.epsDilutedTtm?.asOf||v.metrics?.revenueTtm?.asOf||"?";
     const sec="SEC EDGAR (งบ "+secDate+")";
