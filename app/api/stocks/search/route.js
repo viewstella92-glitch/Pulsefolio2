@@ -70,7 +70,7 @@ export async function POST(req){
     let found=results.find(x=>x.ticker===ticker);
     if(!found)return NextResponse.json({error:"ไม่พบหุ้นนี้ใน Yahoo Finance"},{status:404});
     found=await enrichStock(found);
-    const sync=await fetch("https://ailjqgahjjnlhlabooip.supabase.co/functions/v1/pulse-sync",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({tickers:[ticker],metadata:{[ticker]:found},seed:{[ticker]:found}})});
+    const seed={...found};delete seed.growth_current;delete seed.growth_next;const sync=await fetch("https://ailjqgahjjnlhlabooip.supabase.co/functions/v1/pulse-sync",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({tickers:[ticker],metadata:{[ticker]:found},seed:{[ticker]:seed}})});
     const syncText=await sync.text();
     const syncResult=syncText ? JSON.parse(syncText) : null;
     if(!sync.ok || syncResult?.failed>0){
