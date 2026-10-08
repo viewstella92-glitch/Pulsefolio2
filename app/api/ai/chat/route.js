@@ -22,7 +22,7 @@ export async function POST(req){
     const history=Array.isArray(body?.history)
       ? body.history.slice(-4).map(x=>({
           role:x?.role==="assistant"?"assistant":"user",
-          text:String(x?.text??x?.content??"").slice(0,1200)
+          text:String(x?.text??x?.content??"").slice(0,1500)
         })).filter(x=>x.text.trim())
       : [];
 
