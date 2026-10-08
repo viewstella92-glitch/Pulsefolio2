@@ -11,7 +11,16 @@ async function enrichWithVerified(stock){
   const out={...stock};
   const src={};
   const fill=(k,v,label)=>{
-    if(num(out[k])==null&&num(v)!=null){out[k]=num(v);src[k]=label;}
+    if(num(v)==null)return;
+    const old=num(out[k]);
+    if(old!=null&&Math.abs(old-num(v))>Math.max(Math.abs(num(v))*0.03,0.01)){
+      out.data_quality_details={
+        ...(out.data_quality_details||{}),
+        ["conflict_"+k]:{previous:old,verified:num(v),detected_at:new Date().toISOString()}
+      };
+    }
+    out[k]=num(v);
+    src[k]=label;
   };
 
   const v=await getVerified(out.ticker);
