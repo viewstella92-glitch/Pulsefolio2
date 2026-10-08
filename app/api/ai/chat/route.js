@@ -2,10 +2,10 @@ import { callGemini } from "../../../lib/gemini";
 import { getVerified } from "../../../lib/edgar";
 export const maxDuration=60;
 
-const ALIASES={nvidia:"NVDA","เอ็นวิเดีย":"NVDA","เอนวิเดีย":"NVDA","เอ็นวีเดีย":"NVDA",salesforce:"CRM","เซลส์ฟอร์ซ":"CRM","เซลฟอร์ซ":"CRM",cigna:"CI","ซิกน่า":"CI",micron:"MU","ไมครอน":"MU",adobe:"ADBE","อะโดบี":"ADBE","อโดบี":"ADBE",applovin:"APP","แอปเลิฟวิน":"APP",intuit:"INTU","อินทูอิท":"INTU",netflix:"NFLX","เน็ตฟลิกซ์":"NFLX","เน็ตฟลิก":"NFLX",vertiv:"VRT","เวอร์ทิฟ":"VRT",mercadolibre:"MELI","เมอร์คาโด":"MELI",grab:"GRAB","แกร็บ":"GRAB","แกรบ":"GRAB",zoetis:"ZTS","โซเอทิส":"ZTS",autozone:"AZO","ออโต้โซน":"AZO",blackrock:"BLK","แบล็คร็อค":"BLK","แบลคร็อก":"BLK",mastercard:"MA","มาสเตอร์การ์ด":"MA",apple:"AAPL","แอปเปิล":"AAPL","แอปเปิ้ล":"AAPL",""arm holdings":"ARM","อาร์ม":"ARM","astera labs":"ALAB","แอสเทอรา":"ALAB",centrus:"LEU","เซ็นทรัส":"LEU","novo nordisk":"NVO","โนโว":"NVO",broadcom:"AVGO","บรอดคอม":"AVGO"};
+const ALIASES={nvidia:"NVDA","เอ็นวิเดีย":"NVDA","เอนวิเดีย":"NVDA","เอ็นวีเดีย":"NVDA",salesforce:"CRM","เซลส์ฟอร์ซ":"CRM","เซลฟอร์ซ":"CRM",cigna:"CI","ซิกน่า":"CI",micron:"MU","ไมครอน":"MU",adobe:"ADBE","อะโดบี":"ADBE","อโดบี":"ADBE",applovin:"APP","แอปเลิฟวิน":"APP",intuit:"INTU","อินทูอิท":"INTU",netflix:"NFLX","เน็ตฟลิกซ์":"NFLX","เน็ตฟลิก":"NFLX",vertiv:"VRT","เวอร์ทิฟ":"VRT",mercadolibre:"MELI","เมอร์คาโด":"MELI",grab:"GRAB","แกร็บ":"GRAB","แกรบ":"GRAB",zoetis:"ZTS","โซเอทิส":"ZTS",autozone:"AZO","ออโต้โซน":"AZO",blackrock:"BLK","แบล็คร็อค":"BLK","แบลคร็อก":"BLK",mastercard:"MA","มาสเตอร์การ์ด":"MA",apple:"AAPL","แอปเปิล":"AAPL","แอปเปิ้ล":"AAPL","arm holdings":"ARM","อาร์ม":"ARM","astera labs":"ALAB","แอสเทอรา":"ALAB",centrus:"LEU","เซ็นทรัส":"LEU","novo nordisk":"NVO","โนโว":"NVO",broadcom:"AVGO","บรอดคอม":"AVGO"};
 
 const NAME_STOP=new Set(["the","inc","corp","corporation","company","holdings","group","global","international","american","united","first","new"]);
-const BASE_COLS="ticker,name,price,trailing_pe,forward_pe,peg,growth_current,growth_next,growth_long,revenue_growth,roe,profit_margin,free_cash_flow,debt_to_equity,beta,industry_forward_pe,fair_value_low,fair_value_base,fair_value_high,market_cap,updated_at,data_source,data_quality,eps_estimate_current,eps_estimate_7d,eps_estimate_30d,eps_estimate_60d,eps_estimate_90d,earnings_revision_score";
+const BASE_COLS="ticker,name,price,trailing_pe,forward_pe,peg,growth_current,growth_next,growth_long,revenue_growth,roe,profit_margin,free_cash_flow,debt_to_equity,beta,industry_forward_pe,fair_value_low,fair_value_base,fair_value_high,market_cap,updated_at,data_source,data_quality,eps_trailing,eps_estimate_current,eps_estimate_7d,eps_estimate_30d,eps_estimate_60d,eps_estimate_90d,earnings_revision_score";
 const EXTRA_COLS="data_quality_details,field_sources,fair_value_assumptions";
 
 const num=v=>v==null||v===""||!Number.isFinite(Number(v))?null:Number(v);
@@ -86,16 +86,16 @@ export async function POST(req){
 
     const knownTickers=new Set((fundamentals||[]).map(x=>String(x.ticker||"").trim().toUpperCase()).filter(Boolean));
 
-    const tokenMatches=(question.match(/(?<![A-Za-z])\\$?[A-Za-z]{1,5}(?:[.-][A-Za-z]{1,3})?(?![A-Za-z])/g)||[])
-      .filter(t=>t.replace(/^\\$/,"")===t.replace(/^\\$/,"").toUpperCase()||t.replace(/^\\$/,"").length>=4)
-      .map(t=>t.replace(/^\\$/,"").toUpperCase())
+    const tokenMatches=(question.match(/(?<![A-Za-z])\$?[A-Za-z]{1,5}(?:[.-][A-Za-z]{1,3})?(?![A-Za-z])/g)||[])
+      .filter(t=>t.replace(/^\$/,"")===t.replace(/^\$/,"").toUpperCase()||t.replace(/^\$/,"").length>=4)
+      .map(t=>t.replace(/^\$/,"").toUpperCase())
       .filter(t=>knownTickers.has(t));
 
     const q=question.toLowerCase();
     const nameAlias=new Map(Object.entries(ALIASES));
 
     for(const x of fundamentals||[]){
-      const w=String(x.name||"").toLowerCase().split(/[\\s,.]+/)[0];
+      const w=String(x.name||"").toLowerCase().split(/[\s,.]+/)[0];
       if(w.length>=5&&!NAME_STOP.has(w))nameAlias.set(w,String(x.ticker||"").toUpperCase());
     }
 
