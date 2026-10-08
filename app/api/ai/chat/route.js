@@ -43,7 +43,7 @@ const reconcile=(fund,verified)=>{
   return {data:out,conflicts};
 };
 
-const compact=r=>({ticker:r.ticker,name:r.name,price:r.price,trailing_pe:r.trailing_pe,forward_pe:r.forward_pe,peg:r.peg,growth_current:r.growth_current,growth_next:r.growth_next,growth_long:r.growth_long,revenue_growth:r.revenue_growth,roe:r.roe,profit_margin:r.profit_margin,free_cash_flow:r.free_cash_flow,debt_to_equity:r.debt_to_equity,beta:r.beta,industry_forward_pe:r.industry_forward_pe,fair_value_low:r.fair_value_low,fair_value_base:r.fair_value_base,fair_value_high:r.fair_value_high,market_cap:r.market_cap,data_quality:r.data_quality,data_quality_details:r.data_quality_details,field_sources:r.field_sources,fair_value_assumptions:r.fair_value_assumptions,updated_at:r.updated_at,data_source:r.data_source});
+const compact=r=>({ticker:r.ticker,name:r.name,price:r.price,trailing_pe:r.trailing_pe,forward_pe:r.forward_pe,peg:r.peg,growth_current:r.growth_current,growth_next:r.growth_next,growth_long:r.growth_long,revenue_growth:r.revenue_growth,roe:r.roe,profit_margin:r.profit_margin,free_cash_flow:r.free_cash_flow,debt_to_equity:r.debt_to_equity,beta:r.beta,industry_forward_pe:r.industry_forward_pe,fair_value_low:r.fair_value_low,fair_value_base:r.fair_value_base,fair_value_high:r.fair_value_high,market_cap:r.market_cap,eps_revision_up_7d:r.eps_revision_up_7d,eps_revision_down_7d:r.eps_revision_down_7d,eps_revision_up_30d:r.eps_revision_up_30d,eps_revision_down_30d:r.eps_revision_down_30d,eps_estimate_current:r.eps_estimate_current,eps_estimate_7d:r.eps_estimate_7d,eps_estimate_30d:r.eps_estimate_30d,eps_estimate_60d:r.eps_estimate_60d,eps_estimate_90d:r.eps_estimate_90d,earnings_revision_score:r.earnings_revision_score,earnings_date:r.earnings_date,earnings_source:r.earnings_source,earnings_estimated:r.earnings_estimated,data_quality:r.data_quality,data_quality_details:r.data_quality_details,field_sources:r.field_sources,fair_value_assumptions:r.fair_value_assumptions,updated_at:r.updated_at,data_source:r.data_source});
 
 export async function POST(req){
   const key=process.env.GEMINI_API_KEY;
@@ -129,12 +129,16 @@ export async function POST(req){
       .sort((x,y)=>y.avg-x.avg)
       .map(x=>x.ticker);
 
-    const verificationCandidates=tickers.slice(0,3);
+    const verificationCandidates=[...new Set([
+      ...tickers,
+      ...mine,
+      ...rankedTickers
+    ])].filter(Boolean).slice(0,5);
 
     const verifiedRows=verificationCandidates.length
       ?await Promise.all(verificationCandidates.map(t=>withTimeout(
         getVerified(t),
-        12000,
+        10000,
         {ok:false,ticker:t,reason:"หมดเวลาดึงข้อมูลจาก SEC (ระบบยังโหลดต่อ ลองถามใหม่อีกครั้ง)"}
       )))
       :[];
